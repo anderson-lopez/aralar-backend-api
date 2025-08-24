@@ -1,0 +1,30 @@
+[project]
+name = "aralar"
+version = "0.1.0"
+requires-python = ">=3.12"
+readme = "README.md"
+dependencies = [
+  "flask", "flask-jwt-extended", "flask-cors", "flask-limiter", "flask-talisman",
+  "pymongo", "marshmallow", "flask-smorest", "python-dotenv",
+  "argon2-cffi", "pydantic", "email-validator",
+  "gunicorn", "structlog"
+]
+
+[project.optional-dependencies]
+dev = [
+  "black",
+  "ruff",
+  "pytest",
+  "coverage",
+  "pip-tools"
+]
+
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 100
+
+[tool.ruff]
+line-length = 100

@@ -1,0 +1,94 @@
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Variables de entorno y secretos (mantener .env.example)
+.env
+.env.*
+!.env.example
+*.env.local
+
+# Cachés de Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Compilados/C-ext
+*.so
+*.pyd
+*.dll
+
+# Distribución/paquetes
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Logs y PIDs
+logs/
+*.log
+*.pid
+*.seed
+
+# Testing y coverage
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+htmlcov/
+
+# Tipado/Linters
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# Flask
+instance/
+*.sqlite
+*.sqlite3
+instance/*.db
+*.db-journal
+.flaskenv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# IDE/Editor
+.vscode/
+.idea/
+*.code-workspace
+
+# Sistemas operativos
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Docker/Compose (si generas estos archivos locales)
+.docker/
