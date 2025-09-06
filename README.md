@@ -22,28 +22,33 @@ Una API REST moderna construida con Flask para gestión de usuarios, roles y per
 ## 🛠️ Instalación en Windows
 
 ### 1. Clonar el repositorio
+
 ```bash
 git clone <tu-repositorio>
 cd aralar-api
 ```
 
 ### 2. Crear entorno virtual
+
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 ```
 
 ### 3. Instalar dependencias
+
 ```bash
 pip install -r requirements.txt
 ```
 
 ### 4. Configurar variables de entorno
+
 ```bash
 copy .env.example .env
 ```
 
 Edita el archivo `.env` con tus configuraciones:
+
 ```env
 FLASK_ENV=development
 SECRET_KEY=tu_clave_secreta_aqui
@@ -60,21 +65,26 @@ SEED_ADMIN_FULLNAME="Admin Aralar"
 ### 5. Configurar MongoDB
 
 #### Opción A: MongoDB Local
+
 1. Descargar e instalar [MongoDB Community Server](https://www.mongodb.com/try/download/community)
 2. Iniciar el servicio MongoDB
 3. Crear la base de datos `aralar`
 
 #### Opción B: Docker (Recomendado)
+
 ```bash
 docker-compose up -d mongo
 ```
 
 ### 6. Inicializar la base de datos
+
 ```bash
 python scripts/seed.py
+python scripts/migrate.py
 ```
 
 Este script creará:
+
 - Índices necesarios
 - Catálogo de permisos
 - Roles base (admin, manager, staff)
@@ -83,6 +93,7 @@ Este script creará:
 ## 🚀 Ejecutar la aplicación
 
 ### Desarrollo
+
 ```bash
 # Activar entorno virtual
 .venv\Scripts\activate
@@ -95,6 +106,7 @@ python -m flask --app aralar.app run --debug
 ```
 
 ### Producción
+
 ```bash
 # Con Gunicorn
 gunicorn -c gunicorn.conf.py wsgi:app
@@ -106,6 +118,7 @@ docker-compose up --build
 ## 📚 Documentación de la API
 
 Una vez ejecutando la aplicación, accede a:
+
 - **Swagger UI**: http://localhost:5000/api/docs/swagger-ui
 - **ReDoc**: http://localhost:5000/api/docs/redoc
 - **OpenAPI JSON**: http://localhost:5000/api/docs/openapi.json
@@ -113,10 +126,12 @@ Una vez ejecutando la aplicación, accede a:
 ## 🔐 Endpoints Principales
 
 ### Autenticación
+
 - `POST /api/auth/login` - Iniciar sesión
 - `GET /api/auth/me` - Información del usuario actual
 
 ### Usuarios
+
 - `POST /api/users` - Crear usuario (requiere permisos)
 - `GET /api/users` - Listar usuarios (requiere permisos)
 - `PUT /api/users/{id}/roles` - Asignar roles (requiere permisos)
@@ -164,12 +179,14 @@ python -m pytest tests/ -v
 ## 🔧 Desarrollo
 
 ### Agregar nuevos endpoints
+
 1. Crear controlador en `aralar/api/{modulo}/`
 2. Definir blueprint en `blueprint.py`
 3. Registrar en `aralar/api/routes.py`
 4. Agregar schemas en `aralar/schemas/`
 
 ### Sistema de permisos
+
 - Los permisos se definen en `scripts/seed.py`
 - Usar decoradores `@require_permissions()` o `@require_roles()`
 - Los permisos efectivos se calculan: `(permisos_rol + allow) - deny`
@@ -177,15 +194,18 @@ python -m pytest tests/ -v
 ## 🐛 Solución de Problemas
 
 ### Error de conexión a MongoDB
+
 - Verificar que MongoDB esté ejecutándose
 - Revisar la variable `MONGO_URI` en `.env`
 - Para Docker: `docker-compose logs mongo`
 
 ### Error de importación
+
 - Verificar que el entorno virtual esté activado
 - Reinstalar dependencias: `pip install -r requirements.txt`
 
 ### Error de permisos JWT
+
 - Verificar que el usuario tenga los roles/permisos necesarios
 - Revisar que el token JWT sea válido
 - Ejecutar `python scripts/seed.py` para recrear datos iniciales
