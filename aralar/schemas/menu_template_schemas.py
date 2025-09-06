@@ -76,3 +76,37 @@ class MenuTemplateUpdateSchema(MenuTemplateCreateSchema):
 class MenuTemplatePublishSchema(Schema):
     # opcionalmente forzar nuevo slug/notes; aquí solo placeholder
     notes = fields.String(required=False)
+
+
+# Respuesta completa de un template (incluye metadatos comunes)
+class MenuTemplateSchema(Schema):
+    _id = fields.String(dump_only=True)
+    name = fields.String(required=True)
+    slug = fields.String(required=True)
+    version = fields.Integer()
+    status = fields.String(validate=validate.OneOf(["draft", "published", "archived"]))
+    tenant_id = fields.String(required=True)
+    i18n = fields.Dict()
+    sections = fields.List(fields.Nested(SectionSchema))
+    ui = fields.Dict()
+    publish_notes = fields.String(load_default="", dump_default="")
+    created_at = fields.DateTime(dump_only=True)
+    updated_at = fields.DateTime(dump_only=True)
+
+
+class MenuTemplateListSchema(Schema):
+    items = fields.List(fields.Nested(MenuTemplateSchema))
+
+
+class IdSchema(Schema):
+    id = fields.String()
+
+
+class MessageSchema(Schema):
+    message = fields.String()
+
+
+class MenuTemplateQueryArgs(Schema):
+    status = fields.String(required=False, validate=validate.OneOf(["draft", "published", "archived"]))
+    slug = fields.String(required=False)
+    tenant_id = fields.String(required=False)

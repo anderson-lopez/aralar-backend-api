@@ -1,12 +1,16 @@
-from flask_smorest import Blueprint
-from flask import request, current_app, jsonify, make_response
-from marshmallow import ValidationError
+from flask_smorest import Blueprint, abort
+from flask import current_app
 from ...repositories.menu_templates_repo import MenuTemplatesRepo
 from ...services.menu_templates_service import MenuTemplatesService
 from ...schemas.menu_template_schemas import (
     MenuTemplateCreateSchema,
     MenuTemplateUpdateSchema,
     MenuTemplatePublishSchema,
+    MenuTemplateSchema,
+    MenuTemplateListSchema,
+    MenuTemplateQueryArgs,
+    IdSchema,
+    MessageSchema,
 )
 from ...core.security import require_permissions
 
@@ -17,10 +21,6 @@ blp = Blueprint(
     description="Menu Templates",
 )
 
-create_schema = MenuTemplateCreateSchema()
-update_schema = MenuTemplateUpdateSchema()
-publish_schema = MenuTemplatePublishSchema()
-
 def get_svc():
     db = current_app.mongo_db
     return MenuTemplatesService(MenuTemplatesRepo(db))
@@ -28,75 +28,86 @@ def get_svc():
 
 @blp.route("", methods=["POST"])
 @require_permissions("menu_templates:create")
-def create_template():
+@blp.arguments(MenuTemplateCreateSchema)
+@blp.response(201, IdSchema)
+@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.doc(security=[{"bearerAuth": []}])
+def create_template(data):
+    """Create a new menu template (draft by default)"""
     svc = get_svc()
-    try:
-        data = create_schema.load(request.get_json() or {})
-    except ValidationError as err:
-        return make_response(jsonify({"errors": err.messages}), 400)
     _id = svc.create(data)
-    return make_response(jsonify({"id": _id}), 201)
+    return {"id": _id}
 
 
 @blp.route("", methods=["GET"])
 @require_permissions("menu_templates:read")
-def list_templates():
+@blp.arguments(MenuTemplateQueryArgs, location="query")
+@blp.response(200, MenuTemplateListSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def list_templates(query_args):
+    """List templates filtered by optional status, slug, and tenant_id"""
     svc = get_svc()
-    status = request.args.get("status")
-    slug = request.args.get("slug")
-    tenant_id = request.args.get("tenant_id")
-    items = svc.list(status=status, slug=slug, tenant_id=tenant_id)
-    return make_response(jsonify({"items": items}), 200)
+    items = svc.list(**query_args)
+    return {"items": items}
 
 
 @blp.route("/<template_id>", methods=["GET"])
 @require_permissions("menu_templates:read")
+@blp.response(200, MenuTemplateSchema)
+@blp.alt_response(404, schema=MessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
 def get_template(template_id):
     svc = get_svc()
     doc = svc.get(template_id)
     if not doc:
-        return make_response(jsonify({"message": "not found"}), 404)
-    return make_response(jsonify(doc), 200)
+        abort(404, message="not found")
+    return doc
 
 
 @blp.route("/<template_id>", methods=["PUT"])
 @require_permissions("menu_templates:update")
-def update_template(template_id):
+@blp.arguments(MenuTemplateUpdateSchema)
+@blp.response(200, MessageSchema)
+@blp.alt_response(404, schema=MessageSchema)
+@blp.alt_response(409, schema=MessageSchema)
+@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.doc(security=[{"bearerAuth": []}])
+def update_template(template_id, patch):
     svc = get_svc()
-    try:
-        patch = update_schema.load(request.get_json() or {})
-    except ValidationError as err:
-        return make_response(jsonify({"errors": err.messages}), 400)
     result = svc.update_draft(template_id, patch)
     if result is None:
-        return make_response(jsonify({"message": "not found"}), 404)
+        abort(404, message="not found")
     if isinstance(result, dict) and result.get("conflict"):
-        return make_response(jsonify({"message": result["conflict"]}), 409)
-    return make_response(jsonify({"message": "ok"}), 200)
+        abort(409, message=result["conflict"])
+    return {"message": "ok"}
 
 
 @blp.route("/<template_id>/publish", methods=["POST"])
 @require_permissions("menu_templates:publish")
-def publish_template(template_id):
+@blp.arguments(MenuTemplatePublishSchema)
+@blp.response(201, IdSchema)
+@blp.alt_response(404, schema=MessageSchema)
+@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.doc(security=[{"bearerAuth": []}])
+def publish_template(template_id, body):
     svc = get_svc()
-    try:
-        body = publish_schema.load(request.get_json() or {})
-    except ValidationError as err:
-        return make_response(jsonify({"errors": err.messages}), 400)
     new_id = svc.publish(template_id, notes=body.get("notes"))
     if not new_id:
-        return make_response(jsonify({"message": "not found"}), 404)
-    return make_response(jsonify({"id": new_id}), 201)
+        abort(404, message="not found")
+    return {"id": new_id}
 
 
 @blp.route("/<template_id>/archive", methods=["POST"])
 @require_permissions("menu_templates:archive")
+@blp.response(200, MessageSchema)
+@blp.alt_response(404, schema=MessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
 def archive_template(template_id):
     svc = get_svc()
     doc = svc.get(template_id)
     if not doc:
-        return make_response(jsonify({"message": "not found"}), 404)
+        abort(404, message="not found")
     if doc.get("status") == "archived":
-        return make_response(jsonify({"message": "already archived"}), 200)
+        return {"message": "already archived"}
     svc.repo.update(template_id, {"status": "archived"})
-    return make_response(jsonify({"message": "ok"}), 200)
+    return {"message": "ok"}

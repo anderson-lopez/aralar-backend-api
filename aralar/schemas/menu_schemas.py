@@ -17,3 +17,51 @@ class MenuCommonUpdateSchema(Schema):
 
 class MenuLocaleUpdateSchema(Schema):
     data = fields.Dict(required=True)  # localized subtree for that locale
+
+
+# Output schemas
+class MenuSchema(Schema):
+    _id = fields.String(dump_only=True)
+    tenant_id = fields.String()
+    template_id = fields.String()
+    template_slug = fields.String()
+    template_version = fields.Integer()
+    status = fields.String()
+    common = fields.Dict()
+    locales = fields.Dict()
+    publish = fields.Dict()
+    availability = fields.Dict()
+    created_at = fields.DateTime(dump_only=True)
+    updated_at = fields.DateTime(dump_only=True)
+
+
+class MenuListSchema(Schema):
+    items = fields.List(fields.Nested(MenuSchema))
+
+
+class MessageSchema(Schema):
+    message = fields.String()
+
+
+class MenuListQueryArgs(Schema):
+    status = fields.String(required=False)
+    tenant_id = fields.String(required=False)
+    template_slug = fields.String(required=False)
+    template_version = fields.Integer(required=False)
+
+
+class PublicAvailableQueryArgs(Schema):
+    locale = fields.String(required=True)
+    tz = fields.String(load_default="Europe/Madrid")
+    date = fields.String(required=False)  # YYYY-MM-DD
+
+
+class MenuPublicItemSchema(Schema):
+    id = fields.String()
+    template_slug = fields.String()
+    template_version = fields.Integer()
+    updated_at = fields.DateTime(allow_none=True)
+
+
+class MenuPublicAvailableListSchema(Schema):
+    items = fields.List(fields.Nested(MenuPublicItemSchema))

@@ -13,6 +13,13 @@ DEFAULT_PERMISSIONS = [
     "users:assign_roles",
     "users:assign_permissions",
     "users:activate",
+    # roles
+    "roles:read",
+    "roles:create",
+    "roles:update",
+    "roles:delete",
+    "roles:permissions:read",
+    "roles:permissions:update",
     # (futuro) menus / reservas
     "menus:read",
     "menus:create",
