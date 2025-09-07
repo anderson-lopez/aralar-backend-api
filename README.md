@@ -137,6 +137,101 @@ Una vez ejecutando la aplicación, accede a:
 - `PUT /api/users/{id}/roles` - Asignar roles (requiere permisos)
 - `PUT /api/users/{id}/permissions` - Asignar permisos (requiere permisos)
 
+## 🍽️ Pasos recomendados: de cero a un menú publicado
+
+Orden operativo con endpoints. Se asume que tu usuario tiene los permisos RBAC indicados entre paréntesis.
+
+### A) Definir Template (editor/admin)
+
+- Crear template (draft)
+  - `POST /api/menu-templates` (perm: `menu_templates:create`)
+  - Body (ejemplo):
+
+```json
+{
+  "name": "Seasonal Menu",
+  "slug": "seasonal-menu",
+  "tenant_id": "aralar",
+  "sections": [
+    { "key": "starters", "schema": { "type": "array" } }
+  ]
+}
+```
+
+- Iterar/editar mientras sea draft
+  - `PUT /api/menu-templates/{template_id}` (perm: `menu_templates:update`)
+
+- Publicar template (versión v1)
+  - `POST /api/menu-templates/{template_id}/publish` (perm: `menu_templates:publish`)
+  - Devuelve un nuevo id publicado (o publica v1 si era draft). A partir de aquí tienes `{slug, version}` estables para crear menús.
+
+### B) Crear Menú (editor/admin)
+
+- Crear menú usando el template publicado
+  - `POST /api/menus` (perm: `menus:create`)
+  - Body mínimo:
+
+```json
+{
+  "tenant_id": "aralar",
+  "template_slug": "seasonal-menu",
+  "template_version": 1,
+  "status": "draft",
+  "common": { }
+}
+```
+
+- Configurar disponibilidad (opcional pero recomendable)
+  - `PUT /api/menus/{menu_id}/availability` (perm: `menus:update`)
+
+```json
+{
+  "timezone": "Europe/Madrid",
+  "days_of_week": ["THU", "FRI"],
+  "date_ranges": [{ "start": "2025-09-01", "end": "2025-12-31" }]
+}
+```
+
+### C) Cargar traducciones (editor/traductor)
+
+- Añadir/editar traducción por idioma
+  - `PUT /api/menus/{menu_id}/locales/es-ES` (perm: `menus:update`)
+  - Body:
+
+```json
+{ "data": { "...solo campos traducibles..." } }
+```
+
+Repite para `en-GB`, etc.
+
+### D) Publicar por idioma (editor/admin)
+
+- Publicar locale
+  - `POST /api/menus/{menu_id}/publish/es-ES` (perm: `menus:publish`)
+  - Opcional: repetir para otros idiomas.
+
+A partir de aquí el público puede ver el menú ES cuando esté disponible según Availability.
+
+### E) Consumo público (usuarios anónimos)
+
+- Descubrir qué menús hay activos hoy (o una fecha)
+  - `GET /api/menus/public/available?locale=es-ES&tz=Europe/Madrid`
+  - Devuelve un array de menús elegibles (IDs, metadatos).
+
+- Renderizar un menú para ese locale (con fallback opcional)
+  - `GET /api/menus/{menu_id}/render?locale=es-ES&fallback=en-GB`
+  - Devuelve el JSON final listo para UI (títulos, secciones, platos, precios…).
+
+Tu frontend público puede:
+- Pedir `/public/available` y mostrar un selector, o
+- Si solo hay un menú activo, ir directo a `/render`.
+
+### Notas rápidas
+
+- `/render` no hace feature-merge con el template; usa solo el contenido del menú (ya validado cuando lo guardas).
+- Si cambias el template (nueva versión), los menús existentes no cambian; los próximos menús deben apuntar a la nueva versión.
+- Si editas contenido no traducible (`common`) o una traducción publicada, `/render` reflejará el cambio sin volver a publicar (puedes exigir re-publicación si lo prefieres).
+
 ## 🏗️ Estructura del Proyecto
 
 ```

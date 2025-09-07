@@ -1,5 +1,5 @@
 from flask_smorest import Blueprint, abort
-from flask import current_app
+from flask import current_app, request
 from ...repositories.menus_repo import MenusRepo
 from ...repositories.menu_templates_repo import MenuTemplatesRepo
 from ...services.menus_service import MenusService
@@ -18,6 +18,7 @@ from ...schemas.menu_schemas import (
 from ...core.security import require_permissions
 
 blp = Blueprint("menus", "menus", description="Menus endpoints")
+
 
 def get_svc():
     # Usa la DB inicializada en init_extensions(app)
@@ -173,3 +174,22 @@ def public_available(query):
             for x in items
         ]
     }
+
+
+@blp.route("/<menu_id>/render", methods=["GET"])
+def render_menu(menu_id):
+    """
+    Devuelve el JSON final fusionado para ser mostrado en el frontend público.
+
+    Query:
+      - locale=es-ES   (requerido)
+      - fallback=en-GB (opcional) => si no hay traducción en 'locale', usa esta
+    """
+    locale = request.args.get("locale")
+    fallback = request.args.get("fallback")
+    if not locale:
+        abort(400, message="locale is required")
+
+    svc = get_svc()
+    payload = svc.render(menu_id, locale=locale, fallback=fallback)
+    return payload
