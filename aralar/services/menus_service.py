@@ -60,8 +60,58 @@ class MenusService:
             return None
         pb = m.get("publish", {})
         pb[locale] = {"status": "published", "published_at": datetime.utcnow().isoformat() + "Z"}
-        # Además marcamos el menú como publicado para que aparezca en /public/available
-        return self.repo.update(menu_id, {"publish": pb, "status": "published"})
+        # Ya no cambiamos el estado global del menú aquí (opción 2)
+        return self.repo.update(menu_id, {"publish": pb})
+
+    def validate_menu(self, menu_id: str) -> dict | None:
+        """Valida si un menú está listo para publicación global.
+        Requisitos mínimos:
+          - availability presente y con days_of_week y date_ranges válidos
+          - al menos un locale publicado
+        Devuelve dict {ok: bool, issues: [str, ...]} o None si no existe.
+        """
+        m = self.repo.get(menu_id)
+        if not m:
+            return None
+        issues: list[str] = []
+        avail = m.get("availability") or {}
+        if not avail:
+            issues.append("availability is required")
+        else:
+            if not avail.get("timezone"):
+                issues.append("availability.timezone is required")
+            if not avail.get("days_of_week"):
+                issues.append("availability.days_of_week must be non-empty")
+            drs = avail.get("date_ranges") or []
+            if not drs:
+                issues.append("availability.date_ranges must be non-empty")
+
+        pub = m.get("publish") or {}
+        has_any_published_locale = any(
+            isinstance(v, dict) and v.get("status") == "published" for v in pub.values()
+        )
+        if not has_any_published_locale:
+            issues.append("at least one locale must be published")
+
+        return {"ok": len(issues) == 0, "issues": issues}
+
+    def publish_menu(self, menu_id: str):
+        """Publica globalmente el menú si pasa la validación mínima."""
+        m = self.repo.get(menu_id)
+        if not m:
+            return None
+        result = self.validate_menu(menu_id)
+        if not result["ok"]:
+            return result
+        self.repo.update(menu_id, {"status": "published"})
+        return {"ok": True, "issues": []}
+
+    def unpublish_menu(self, menu_id: str):
+        """Despublica el menú (vuelve a estado draft)."""
+        m = self.repo.get(menu_id)
+        if not m:
+            return None
+        return self.repo.update(menu_id, {"status": "draft"})
 
     @staticmethod
     def _weekday_code(dt_local) -> str:

@@ -78,6 +78,55 @@ def update_menu_common(menu_id, body):
     return {"message": "ok"}
 
 
+@blp.route("/<menu_id>/validate", methods=["GET"])
+@require_permissions("menus:read")
+@blp.response(200, MessageSchema)
+@blp.alt_response(404, schema=MessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def validate_menu(menu_id):
+    """Valida si el menú está listo para publicación global."""
+    svc = get_svc()
+    result = svc.validate_menu(menu_id)
+    if result is None:
+        abort(404, message="not found")
+    # Reusamos MessageSchema para no crear otro schema: devolvemos un resumen
+    # y adjuntamos issues en el payload (flask-smorest no lo impide aunque el schema sea simple)
+    if result.get("ok"):
+        return {"message": "ok"}
+    # Cuando hay issues, devolvemos 200 con detalle en el cuerpo usando abort no es ideal,
+    # así que retornamos un dict extendido; la UI debe leerlo.
+    return {"message": "invalid", "issues": result.get("issues", [])}
+
+
+@blp.route("/<menu_id>/publish", methods=["POST"])
+@require_permissions("menus:publish")
+@blp.response(200, MessageSchema)
+@blp.alt_response(404, schema=MessageSchema)
+@blp.alt_response(409, schema=MessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def publish_menu(menu_id):
+    svc = get_svc()
+    result = svc.publish_menu(menu_id)
+    if result is None:
+        abort(404, message="not found")
+    if not result.get("ok"):
+        abort(409, message="; ".join(result.get("issues", [])))
+    return {"message": "ok"}
+
+
+@blp.route("/<menu_id>/unpublish", methods=["POST"])
+@require_permissions("menus:publish")
+@blp.response(200, MessageSchema)
+@blp.alt_response(404, schema=MessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def unpublish_menu(menu_id):
+    svc = get_svc()
+    doc = svc.unpublish_menu(menu_id)
+    if not doc:
+        abort(404, message="not found")
+    return {"message": "ok"}
+
+
 @blp.route("/<menu_id>/locales/<locale>", methods=["PUT"])
 @require_permissions("menus:update")
 @blp.arguments(MenuLocaleUpdateSchema)

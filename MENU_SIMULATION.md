@@ -216,8 +216,42 @@ Respuesta (200)
 
 ---
 
-## 8) (Público) Consultar menús disponibles hoy
+## 7.1) Validar si el menú está listo para publicación global
+GET `/api/menus/64f1a1333333333333333333/validate`
+Respuesta (200)
+```json
+{ "message": "ok" }
+```
 
+Si faltan requisitos, devuelve:
+```json
+{ "message": "invalid", "issues": ["availability is required", "at least one locale must be published"] }
+```
+
+## 7.2) Publicar MENÚ (estado global)
+POST `/api/menus/64f1a1333333333333333333/publish`
+Respuesta (200)
+```json
+{ "message": "ok" }
+```
+
+Si faltan requisitos, responde 409 con mensaje describiendo los issues.
+
+## 7.3) (Opcional) Despublicar MENÚ
+POST `/api/menus/64f1a1333333333333333333/unpublish`
+Respuesta (200)
+```json
+{ "message": "ok" }
+```
+
+Nota: Para que un menú aparezca en público se requiere:
+- `status` del menú igual a `published`, y
+- al menos un locale publicado (p. ej., `publish.es-ES.status = "published"`), y
+- una disponibilidad que incluya el día consultado.
+
+---
+
+## 8) (Público) Consultar menús disponibles hoy
 GET `/api/menus/public/available?locale=es-ES&tz=Europe/Madrid`
 
 Respuesta (200)
