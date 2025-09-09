@@ -7,6 +7,7 @@ from marshmallow import Schema, fields, validate
 class UserCreateSchema(Schema):
     email = fields.Email(required=True)
     password = fields.String(required=True, validate=validate.Length(min=8))
+    confirm_password = fields.String(required=True)
     full_name = fields.String(required=True)
     roles = fields.List(fields.String(), load_default=[])
     permissions_allow = fields.List(fields.String(), load_default=[])

@@ -79,7 +79,7 @@ def main():
     # Usuario admin
     email = os.getenv("SEED_ADMIN_EMAIL", "admin@aralar.local")
     full_name = os.getenv("SEED_ADMIN_FULLNAME", "Admin Aralar")
-    password = os.getenv("SEED_ADMIN_PASSWORD", "ChangeMeNow!2025")
+    password = os.getenv("SEED_ADMIN_PASSWORD", "ProjectPassIDK581358")
 
     existing = db["users"].find_one({"email": email})
     if not existing:
