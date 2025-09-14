@@ -11,7 +11,7 @@ from ...schemas.menu_schemas import (
     MenuSchema,
     MenuListSchema,
     MenuListQueryArgs,
-    MessageSchema,
+    MenuMessageSchema,
     PublicAvailableQueryArgs,
     MenuPublicAvailableListSchema,
 )
@@ -30,7 +30,7 @@ def get_svc():
 @require_permissions("menus:create")
 @blp.arguments(MenuCreateSchema)
 @blp.response(201, MenuSchema)
-@blp.alt_response(400, schema=MessageSchema)
+@blp.alt_response(400, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def create_menu(data):
     svc = get_svc()
@@ -54,7 +54,7 @@ def list_menus(query_args):
 @blp.route("/<menu_id>", methods=["GET"])
 @require_permissions("menus:read")
 @blp.response(200, MenuSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def get_menu(menu_id):
     svc = get_svc()
@@ -67,8 +67,8 @@ def get_menu(menu_id):
 @blp.route("/<menu_id>/common", methods=["PUT"])
 @require_permissions("menus:update")
 @blp.arguments(MenuCommonUpdateSchema)
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def update_menu_common(menu_id, body):
     svc = get_svc()
@@ -80,8 +80,8 @@ def update_menu_common(menu_id, body):
 
 @blp.route("/<menu_id>/validate", methods=["GET"])
 @require_permissions("menus:read")
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def validate_menu(menu_id):
     """Valida si el menú está listo para publicación global."""
@@ -100,9 +100,9 @@ def validate_menu(menu_id):
 
 @blp.route("/<menu_id>/publish", methods=["POST"])
 @require_permissions("menus:publish")
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
-@blp.alt_response(409, schema=MessageSchema)
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
+@blp.alt_response(409, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def publish_menu(menu_id):
     svc = get_svc()
@@ -116,8 +116,8 @@ def publish_menu(menu_id):
 
 @blp.route("/<menu_id>/unpublish", methods=["POST"])
 @require_permissions("menus:publish")
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def unpublish_menu(menu_id):
     svc = get_svc()
@@ -130,8 +130,8 @@ def unpublish_menu(menu_id):
 @blp.route("/<menu_id>/locales/<locale>", methods=["PUT"])
 @require_permissions("menus:update")
 @blp.arguments(MenuLocaleUpdateSchema)
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def update_menu_locale(menu_id, locale, body):
     svc = get_svc()
@@ -143,8 +143,8 @@ def update_menu_locale(menu_id, locale, body):
 
 @blp.route("/<menu_id>/publish/<locale>", methods=["POST"])
 @require_permissions("menus:publish")
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def publish_menu_locale(menu_id, locale):
     svc = get_svc()
@@ -156,8 +156,8 @@ def publish_menu_locale(menu_id, locale):
 
 @blp.route("/<menu_id>/archive", methods=["POST"])
 @require_permissions("menus:archive")
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def archive_menu(menu_id):
     svc = get_svc()
@@ -173,9 +173,9 @@ def archive_menu(menu_id):
 @blp.route("/<menu_id>/availability", methods=["PUT"])
 @require_permissions("menus:update")
 @blp.arguments(AvailabilitySchema)
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
+@blp.alt_response(422, schema=MenuMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def set_menu_availability(menu_id, payload):
     svc = get_svc()
@@ -188,7 +188,7 @@ def set_menu_availability(menu_id, payload):
 @blp.route("/public/available", methods=["GET"])
 @blp.arguments(PublicAvailableQueryArgs, location="query")
 @blp.response(200, MenuPublicAvailableListSchema)
-@blp.alt_response(400, schema=MessageSchema)
+@blp.alt_response(400, schema=MenuMessageSchema)
 def public_available(query):
     """List public menus available now or on a given date for a locale and tz."""
     from datetime import datetime, timezone

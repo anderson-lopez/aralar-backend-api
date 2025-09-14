@@ -5,7 +5,7 @@ from ...core.security import require_permissions
 from ...schemas.uploads_schemas import (
     UploadPresignRequestSchema,
     UploadPresignResponseSchema,
-    MessageSchema,
+    UploadsMessageSchema,
 )
 
 blp = Blueprint("uploads", "uploads", description="Uploads (presigned)")
@@ -17,8 +17,8 @@ svc = UploadsService()
 @require_permissions("menus:update")
 @blp.arguments(UploadPresignRequestSchema)
 @blp.response(200, UploadPresignResponseSchema)
-@blp.alt_response(400, schema=MessageSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.alt_response(400, schema=UploadsMessageSchema)
+@blp.alt_response(422, schema=UploadsMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def presign(body):
     filename = body.get("filename")

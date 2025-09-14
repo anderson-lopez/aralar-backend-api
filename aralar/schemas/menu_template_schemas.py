@@ -102,7 +102,7 @@ class IdSchema(Schema):
     id = fields.String()
 
 
-class MessageSchema(Schema):
+class MenuTemplateMessageSchema(Schema):
     message = fields.String()
 
 

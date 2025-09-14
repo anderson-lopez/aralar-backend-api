@@ -13,6 +13,5 @@ class UploadPresignResponseSchema(Schema):
     key = fields.String()
 
 
-class MessageSchema(Schema):
+class UploadsMessageSchema(Schema):
     message = fields.String()
-

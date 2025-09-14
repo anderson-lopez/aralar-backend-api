@@ -39,7 +39,7 @@ class MenuListSchema(Schema):
     items = fields.List(fields.Nested(MenuSchema))
 
 
-class MessageSchema(Schema):
+class MenuMessageSchema(Schema):
     message = fields.String()
 
 

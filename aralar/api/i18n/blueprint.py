@@ -11,7 +11,7 @@ from ...schemas.i18n_schemas import (
     GlossaryUpsertSchema,
     GlossaryQuerySchema,
     GlossaryResponseSchema,
-    MessageSchema,
+    I18nMessageSchema,
 )
 
 blp = Blueprint("i18n", "i18n", description="Translation API")
@@ -28,7 +28,7 @@ def get_svc():
 @require_permissions("menus:update")
 @blp.arguments(TranslateRequestSchema)
 @blp.response(200, TranslateResponseSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.alt_response(422, schema=I18nMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def translate(body):
     texts = body.get("texts") or []
@@ -53,7 +53,7 @@ def translate(body):
 @require_permissions("menus:update")
 @blp.arguments(DetectRequestSchema)
 @blp.response(200, DetectResponseSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.alt_response(422, schema=I18nMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def detect(body):
     texts = body.get("texts") or []
@@ -66,7 +66,7 @@ def detect(body):
 @require_permissions("menus:update")
 @blp.arguments(GlossaryUpsertSchema)
 @blp.response(200, GlossaryResponseSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.alt_response(422, schema=I18nMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def upsert_glossary(body):
     tenant_id = body.get("tenant_id")
@@ -98,8 +98,8 @@ def upsert_glossary(body):
 @require_permissions("menus:update")
 @blp.arguments(GlossaryQuerySchema, location="query")
 @blp.response(200, GlossaryResponseSchema)
-@blp.alt_response(404, schema=MessageSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.alt_response(404, schema=I18nMessageSchema)
+@blp.alt_response(422, schema=I18nMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def current_glossary(query):
     tenant_id = query.get("tenant_id")

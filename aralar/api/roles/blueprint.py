@@ -9,7 +9,7 @@ from ...schemas.role_schemas import (
     PermissionSchema,
     PermissionUpsertSchema,
     PermissionListSchema,
-    MessageSchema,
+    RoleMessageSchema,
 )
 from ...core.security import require_permissions
 
@@ -36,7 +36,7 @@ def list_roles():
 @require_permissions("roles:create")
 @blp.arguments(RoleCreateUpdateSchema)
 @blp.response(201, RoleSchema)
-@blp.alt_response(409, schema=MessageSchema)
+@blp.alt_response(409, schema=RoleMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def create_role(body):
     svc = get_svc()
@@ -51,7 +51,7 @@ def create_role(body):
 @blp.route("/<name>", methods=["GET"])
 @require_permissions("roles:read")
 @blp.response(200, RoleSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.alt_response(404, schema=RoleMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def get_role(name):
     svc = get_svc()
@@ -65,7 +65,7 @@ def get_role(name):
 @require_permissions("roles:update")
 @blp.arguments(RoleCreateUpdateSchema)
 @blp.response(200, RoleSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.alt_response(404, schema=RoleMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def update_role(name, body):
     svc = get_svc()
@@ -77,7 +77,7 @@ def update_role(name, body):
 
 @blp.route("/<name>", methods=["DELETE"])
 @require_permissions("roles:delete")
-@blp.response(200, MessageSchema)
+@blp.response(200, RoleMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def delete_role(name):
     svc = get_svc()

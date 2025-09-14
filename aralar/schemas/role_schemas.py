@@ -31,5 +31,5 @@ class PermissionListSchema(Schema):
     items = fields.List(fields.Nested(PermissionSchema))
 
 
-class MessageSchema(Schema):
+class RoleMessageSchema(Schema):
     message = fields.String()

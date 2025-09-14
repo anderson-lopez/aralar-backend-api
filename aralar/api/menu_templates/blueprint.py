@@ -10,7 +10,7 @@ from ...schemas.menu_template_schemas import (
     MenuTemplateListSchema,
     MenuTemplateQueryArgs,
     IdSchema,
-    MessageSchema,
+    MenuTemplateMessageSchema,
 )
 from ...core.security import require_permissions
 
@@ -30,7 +30,7 @@ def get_svc():
 @require_permissions("menu_templates:create")
 @blp.arguments(MenuTemplateCreateSchema)
 @blp.response(201, IdSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.alt_response(422, schema=MenuTemplateMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def create_template(data):
     """Create a new menu template (draft by default)"""
@@ -54,7 +54,7 @@ def list_templates(query_args):
 @blp.route("/<template_id>", methods=["GET"])
 @require_permissions("menu_templates:read")
 @blp.response(200, MenuTemplateSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.alt_response(404, schema=MenuTemplateMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def get_template(template_id):
     svc = get_svc()
@@ -67,10 +67,10 @@ def get_template(template_id):
 @blp.route("/<template_id>", methods=["PUT"])
 @require_permissions("menu_templates:update")
 @blp.arguments(MenuTemplateUpdateSchema)
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
-@blp.alt_response(409, schema=MessageSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.response(200, MenuTemplateMessageSchema)
+@blp.alt_response(404, schema=MenuTemplateMessageSchema)
+@blp.alt_response(409, schema=MenuTemplateMessageSchema)
+@blp.alt_response(422, schema=MenuTemplateMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def update_template(template_id, patch):
     svc = get_svc()
@@ -86,8 +86,8 @@ def update_template(template_id, patch):
 @require_permissions("menu_templates:publish")
 @blp.arguments(MenuTemplatePublishSchema)
 @blp.response(201, IdSchema)
-@blp.alt_response(404, schema=MessageSchema)
-@blp.alt_response(422, schema=MessageSchema, description="Validation error")
+@blp.alt_response(404, schema=MenuTemplateMessageSchema)
+@blp.alt_response(422, schema=MenuTemplateMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def publish_template(template_id, body):
     svc = get_svc()
@@ -99,8 +99,8 @@ def publish_template(template_id, body):
 
 @blp.route("/<template_id>/archive", methods=["POST"])
 @require_permissions("menu_templates:archive")
-@blp.response(200, MessageSchema)
-@blp.alt_response(404, schema=MessageSchema)
+@blp.response(200, MenuTemplateMessageSchema)
+@blp.alt_response(404, schema=MenuTemplateMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
 def archive_template(template_id):
     svc = get_svc()

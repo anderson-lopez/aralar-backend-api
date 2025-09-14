@@ -56,5 +56,5 @@ class GlossaryResponseSchema(Schema):
     pairs = fields.List(fields.Dict(keys=fields.String(), values=fields.String()))
 
 
-class MessageSchema(Schema):
+class I18nMessageSchema(Schema):
     message = fields.String()
