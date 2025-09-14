@@ -67,6 +67,7 @@ six==1.17.0
 structlog==25.4.0
 typing-inspection==0.4.1
 typing_extensions==4.14.1
+tzdata==2025.1
 urllib3==2.5.0
 virtualenv==20.33.1
 webargs==8.7.0

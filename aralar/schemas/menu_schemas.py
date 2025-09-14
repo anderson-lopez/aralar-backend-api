@@ -65,3 +65,10 @@ class MenuPublicItemSchema(Schema):
 
 class MenuPublicAvailableListSchema(Schema):
     items = fields.List(fields.Nested(MenuPublicItemSchema))
+
+
+class RenderQueryArgs(Schema):
+    # Required locale for rendering, e.g. "es-ES"
+    locale = fields.String(required=True)
+    # Optional fallback locale if a key is missing in 'locale'
+    fallback = fields.String(required=False)

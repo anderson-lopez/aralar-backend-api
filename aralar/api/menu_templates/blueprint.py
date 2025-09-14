@@ -72,7 +72,7 @@ def get_template(template_id):
 @blp.alt_response(409, schema=MenuTemplateMessageSchema)
 @blp.alt_response(422, schema=MenuTemplateMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
-def update_template(template_id, patch):
+def update_template(patch, template_id):
     svc = get_svc()
     result = svc.update_draft(template_id, patch)
     if result is None:
@@ -89,7 +89,7 @@ def update_template(template_id, patch):
 @blp.alt_response(404, schema=MenuTemplateMessageSchema)
 @blp.alt_response(422, schema=MenuTemplateMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
-def publish_template(template_id, body):
+def publish_template(body, template_id):
     svc = get_svc()
     new_id = svc.publish(template_id, notes=body.get("notes"))
     if not new_id:

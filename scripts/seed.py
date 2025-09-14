@@ -1,9 +1,16 @@
 from datetime import datetime
 from dotenv import load_dotenv
+import os
+import sys
 from argon2 import PasswordHasher
 from pymongo import MongoClient
 from bson import ObjectId
+
 load_dotenv()
+# Ensure project root (one level up) is on sys.path when running from scripts/
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 from aralar.config import BaseConfig as Config
 
 DEFAULT_PERMISSIONS = [
@@ -31,6 +38,15 @@ DEFAULT_PERMISSIONS = [
     "reservas:create",
     "reservas:update",
     "reservas:delete",
+    "menus:publish",
+    "menus:validate",
+    "menu_templates:read",
+    "menu_templates:create",
+    "menu_templates:update",
+    "menu_templates:delete",
+    "menu_templates:publish",
+    "menu_templates:validate",
+    "menu_templates:archive",
 ]
 
 ROLE_TEMPLATES = {

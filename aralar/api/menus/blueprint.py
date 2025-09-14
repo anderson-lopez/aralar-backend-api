@@ -1,5 +1,6 @@
 from flask_smorest import Blueprint, abort
 from flask import current_app, request
+from bson import ObjectId
 from ...repositories.menus_repo import MenusRepo
 from ...repositories.menu_templates_repo import MenuTemplatesRepo
 from ...services.menus_service import MenusService
@@ -14,10 +15,18 @@ from ...schemas.menu_schemas import (
     MenuMessageSchema,
     PublicAvailableQueryArgs,
     MenuPublicAvailableListSchema,
+    RenderQueryArgs,
 )
 from ...core.security import require_permissions
 
 blp = Blueprint("menus", "menus", description="Menus endpoints")
+
+
+def _abort_if_invalid_id(_id: str):
+    try:
+        ObjectId(_id)
+    except Exception:
+        abort(400, message="invalid id")
 
 
 def get_svc():
@@ -70,7 +79,7 @@ def get_menu(menu_id):
 @blp.response(200, MenuMessageSchema)
 @blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
-def update_menu_common(menu_id, body):
+def update_menu_common(body, menu_id):
     svc = get_svc()
     doc = svc.update_common(menu_id, body["common"])
     if not doc:
@@ -133,7 +142,7 @@ def unpublish_menu(menu_id):
 @blp.response(200, MenuMessageSchema)
 @blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
-def update_menu_locale(menu_id, locale, body):
+def update_menu_locale(body, menu_id, locale):
     svc = get_svc()
     doc = svc.update_locale(menu_id, locale, body["data"])
     if not doc:
@@ -177,7 +186,7 @@ def archive_menu(menu_id):
 @blp.alt_response(404, schema=MenuMessageSchema)
 @blp.alt_response(422, schema=MenuMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
-def set_menu_availability(menu_id, payload):
+def set_menu_availability(payload, menu_id):
     svc = get_svc()
     doc = svc.set_availability(menu_id, payload)
     if not doc:
@@ -226,7 +235,9 @@ def public_available(query):
 
 
 @blp.route("/<menu_id>/render", methods=["GET"])
-def render_menu(menu_id):
+@blp.arguments(RenderQueryArgs, location="query")
+@blp.alt_response(400, schema=MenuMessageSchema, description="Invalid id or params")
+def render_menu(query, menu_id):
     """
     Devuelve el JSON final fusionado para ser mostrado en el frontend público.
 
@@ -234,8 +245,9 @@ def render_menu(menu_id):
       - locale=es-ES   (requerido)
       - fallback=en-GB (opcional) => si no hay traducción en 'locale', usa esta
     """
-    locale = request.args.get("locale")
-    fallback = request.args.get("fallback")
+    _abort_if_invalid_id(menu_id)
+    locale = query.get("locale")
+    fallback = query.get("fallback")
     if not locale:
         abort(400, message="locale is required")
 

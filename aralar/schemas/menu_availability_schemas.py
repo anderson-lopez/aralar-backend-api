@@ -24,7 +24,7 @@ class AvailabilitySchema(Schema):
     )
 
     @validates("timezone")
-    def _valid_tz(self, tzname):
+    def _valid_tz(self, tzname, **kwargs):
         try:
             ZoneInfo(tzname)
         except ZoneInfoNotFoundError:
