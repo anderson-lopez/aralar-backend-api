@@ -2,6 +2,8 @@ import importlib.util
 import os
 from datetime import datetime
 from pymongo import MongoClient
+from dotenv import load_dotenv
+from aralar.config import BaseConfig as Config
 
 MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), "migrations")
 
@@ -14,7 +16,9 @@ def load_module_from_path(path):
 
 
 def main():
-    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/aralar")
+    # Ensure .env is loaded so Config picks up environment values
+    load_dotenv()
+    mongo_uri = Config.MONGO_URI
     client = MongoClient(mongo_uri)
     db = client.get_default_database()
     applied = {m["name"] for m in db["schema_migrations"].find({}, {"name": 1})}

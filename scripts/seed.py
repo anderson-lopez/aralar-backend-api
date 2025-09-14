@@ -1,8 +1,10 @@
-import os
 from datetime import datetime
+from dotenv import load_dotenv
 from argon2 import PasswordHasher
 from pymongo import MongoClient
 from bson import ObjectId
+load_dotenv()
+from aralar.config import BaseConfig as Config
 
 DEFAULT_PERMISSIONS = [
     # usuarios
@@ -57,7 +59,7 @@ ROLE_TEMPLATES = {
 
 
 def main():
-    mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/aralar")
+    mongo_uri = Config.MONGO_URI
     client = MongoClient(mongo_uri)
     db = client.get_default_database()
 
@@ -84,9 +86,9 @@ def main():
         )
 
     # Usuario admin
-    email = os.getenv("SEED_ADMIN_EMAIL", "admin@aralar.local")
-    full_name = os.getenv("SEED_ADMIN_FULLNAME", "Admin Aralar")
-    password = os.getenv("SEED_ADMIN_PASSWORD", "ChangeMeNow!2025")
+    email = Config.SEED_ADMIN_EMAIL
+    full_name = Config.SEED_ADMIN_FULLNAME
+    password = Config.SEED_ADMIN_PASSWORD
 
     existing = db["users"].find_one({"email": email})
     if not existing:

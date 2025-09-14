@@ -9,3 +9,6 @@ def up(db):
     )
     # si tu locale principal es es-ES, acelera filtros publicados:
     db["menus"].create_index([("publish.es-ES.status", 1)])
+    db["menu_templates"].create_index([("slug", 1), ("version", 1)], unique=True)
+    db["menu_templates"].create_index([("status", 1)])
+    db["menu_templates"].create_index([("tenant_id", 1)])
