@@ -6,9 +6,15 @@ from marshmallow import Schema, fields, validate
 
 class UserCreateSchema(Schema):
     email = fields.Email(required=True)
-    password = fields.String(required=True, validate=validate.Length(min=8))
+    password = fields.String(
+        required=True, 
+        validate=validate.Length(min=8, max=128, error="Password must be between 8 and 128 characters")
+    )
     confirm_password = fields.String(required=True)
-    full_name = fields.String(required=True)
+    full_name = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=50, error="Full name must be between 1 and 50 characters")
+    )
     roles = fields.List(fields.String(), load_default=[])
     permissions_allow = fields.List(fields.String(), load_default=[])
     permissions_deny = fields.List(fields.String(), load_default=[])

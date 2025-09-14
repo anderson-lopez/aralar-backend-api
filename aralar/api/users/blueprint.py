@@ -9,6 +9,7 @@ from ...schemas.user_schemas import (
     UserCreateResponseSchema,
     UserListResponseSchema,
 )
+from ...schemas.auth_schemas import ChangePasswordSchema
 from ...core.security import require_permissions
 from ...core.validators import validate_object_id
 from marshmallow import ValidationError
@@ -102,3 +103,15 @@ def deactivate_user(user_id):
     svc = UsersService(UsersRepo(current_app.mongo_db))
     doc = svc.repo.update(user_id, {"is_active": False})
     return doc, 200
+
+
+@blp.route("/<user_id>/change-password", methods=["PUT"])
+@blp.arguments(ChangePasswordSchema)
+@blp.response(200, {"message": "Password changed successfully"})
+@blp.doc(security=[{"bearerAuth": []}])
+@require_permissions("users:change_password")
+@validate_object_id("user_id")
+def change_password(password_data, user_id):
+    svc = UsersService(UsersRepo(current_app.mongo_db))
+    svc.change_password(user_id, password_data)
+    return {"message": "Password changed successfully"}, 200
