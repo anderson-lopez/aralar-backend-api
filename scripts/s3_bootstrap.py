@@ -1,8 +1,13 @@
 import os, json, boto3, botocore
 from dotenv import load_dotenv
+import sys
 
 # Load .env before importing Config so BaseConfig reads updated environment
 load_dotenv()
+# Ensure project root (one level up) is on sys.path when running from scripts/
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 from aralar.config import BaseConfig as Config
 
 # docker compose up -d minio

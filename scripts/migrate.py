@@ -1,8 +1,13 @@
 import importlib.util
 import os
+import sys
 from datetime import datetime
 from pymongo import MongoClient
 from dotenv import load_dotenv
+# Ensure project root (one level up) is on sys.path when running from scripts/
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 from aralar.config import BaseConfig as Config
 
 MIGRATIONS_DIR = os.path.join(os.path.dirname(__file__), "migrations")
