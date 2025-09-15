@@ -15,3 +15,19 @@ class UploadPresignResponseSchema(Schema):
 
 class UploadsMessageSchema(Schema):
     message = fields.String()
+
+
+class UploadProxyFormSchema(Schema):
+    # upload_url (presigned) passed as form field
+    upload_url = fields.String(required=True)
+    # file to upload (documented for Swagger as binary)
+    file = fields.Raw(required=True, metadata={"type": "string", "format": "binary"})
+
+
+class UploadDirectFormSchema(Schema):
+    # optional target folder inside bucket (defaults to "menus")
+    folder = fields.String(required=False)
+    # optional explicit filename and mime; if omitted, use uploaded file name and mimetype
+    filename = fields.String(required=False)
+    mime = fields.String(required=False)
+    file = fields.Raw(required=True, metadata={"type": "string", "format": "binary"})

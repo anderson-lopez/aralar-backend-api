@@ -24,3 +24,11 @@ class UploadsService:
         req = PresignRequest(filename=filename, mime=mime, folder=folder or "menus")
         resp = self.storage.presign_put(req)
         return {"upload_url": resp.upload_url, "public_url": resp.public_url, "key": resp.key}
+
+    def upload_direct(self, *, fileobj, filename: str, mime: str, folder: str):
+        ok, err = self._validate(filename, mime)
+        if not ok:
+            raise ValueError(err)
+        resp = self.storage.upload_direct(fileobj=fileobj, filename=filename, mime=mime, folder=folder or "menus")
+        # Reutilizamos la misma forma de respuesta (upload_url vacío en direct)
+        return {"upload_url": resp.upload_url, "public_url": resp.public_url, "key": resp.key}

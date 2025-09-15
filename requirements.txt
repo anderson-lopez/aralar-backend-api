@@ -61,12 +61,14 @@ python-dotenv==1.1.1
 pytz==2025.2
 PyYAML==6.0.2
 rich==13.9.4
+minio==7.2.9
 s3transfer==0.14.0
 sentinels==1.0.0
 six==1.17.0
 structlog==25.4.0
 typing-inspection==0.4.1
 typing_extensions==4.14.1
+requests==2.32.3
 tzdata==2025.1
 urllib3==2.5.0
 virtualenv==20.33.1

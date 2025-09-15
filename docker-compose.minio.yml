@@ -1,0 +1,25 @@
+version: "3.7"
+
+services:
+  minio:
+    # Usa una imagen con una versión específica para mayor estabilidad
+    image: quay.io/minio/minio:latest
+    container_name: minio-local
+    command: server /data --console-address ":9001"
+    ports:
+      # Puerto para la API de S3
+      - "9000:9000"
+      # Puerto para la consola web de MinIO
+      - "9001:9001"
+    environment:
+      # Credenciales de acceso. ¡Cámbialas por algo seguro!
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      # Mapea la carpeta de datos local al contenedor para que los datos persistan
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
