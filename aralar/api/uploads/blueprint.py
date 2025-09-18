@@ -1,7 +1,9 @@
 from flask_smorest import Blueprint, abort
 from flask import request
 import requests
+import uuid
 from botocore.exceptions import ClientError
+from botocore.config import Config as BotoConfig
 from ...services.uploads_service import UploadsService
 from urllib.parse import urlparse
 from minio import Minio
@@ -13,6 +15,9 @@ from ...schemas.uploads_schemas import (
     UploadProxyFormSchema,
     UploadDirectFormSchema,
 )
+import boto3
+import os
+import tempfile
 
 blp = Blueprint("uploads", "uploads", description="Uploads (presigned)")
 
@@ -29,9 +34,8 @@ svc = UploadsService()
 def presign(body):
     filename = body.get("filename")
     mime = body.get("mime")
-    folder = body.get("folder", "menus")
     try:
-        return svc.presign(filename, mime, folder)
+        return svc.presign(filename, mime)
     except ValueError as e:
         abort(400, message=str(e))
 
@@ -59,15 +63,24 @@ def presign(body):
 def proxy_put_upload():
     upload_url = (request.form or {}).get("upload_url")
     file = (request.files or {}).get("file")
+    # Permitir que el frontend especifique el Content-Type exacto usado en el presign
+    content_type = (request.form or {}).get("content_type")
+    
     if not upload_url:
         abort(422, message="upload_url is required")
     if not file:
         abort(422, message="file is required")
 
-    # Stream the file to the presigned URL. Some providers require Content-Type to match the one used to generate the URL.
+    # Stream the file to the presigned URL. Content-Type y ACL DEBEN coincidir con los usados en presign
     headers = {}
-    if getattr(file, "mimetype", None):
-        headers["Content-Type"] = file.mimetype
+    # Usar content_type del form si está disponible, sino usar el mimetype del archivo
+    mime_to_use = content_type or getattr(file, "mimetype", None)
+    if mime_to_use:
+        headers["Content-Type"] = mime_to_use
+    
+    # 🔑 CLAVE: Agregar ACL header que coincida con el usado en presign
+    headers["x-amz-acl"] = "public-read"
+    
     # Some servers behave better with an explicit Content-Length
     content_length = getattr(file, "content_length", None)
     if isinstance(content_length, int) and content_length >= 0:
@@ -86,6 +99,7 @@ def proxy_put_upload():
 
     if 200 <= resp.status_code < 300:
         etag = resp.headers.get("ETag")
+        # ✅ El archivo ya es público gracias al header x-amz-acl
         return {"message": "ok", "etag": etag}
     else:
         # Try to surface upstream error body if available
@@ -95,6 +109,47 @@ def proxy_put_upload():
         except Exception:
             detail = None
         abort(400, message=f"upstream status={resp.status_code} body={detail}")
+
+
+@blp.route("/presign-info", methods=["GET"])
+@blp.doc(
+    description=(
+        "Información sobre cómo usar URLs presignadas desde el frontend.\n\n"
+        "**IMPORTANTE para Frontend:**\n"
+        "1. Solicita presign: `POST /presign {filename, mime}`\n"
+        "2. Recibe: `{upload_url, public_url, key}`\n"
+        "3. Haz PUT a upload_url con estos headers OBLIGATORIOS:\n"
+        "   - `Content-Type: [mismo mime del presign]`\n"
+        "   - `x-amz-acl: public-read`\n"
+        "4. El archivo quedará público automáticamente\n\n"
+        "**Ejemplo JavaScript:**\n"
+        "```javascript\n"
+        "const response = await fetch(uploadUrl, {\n"
+        "  method: 'PUT',\n"
+        "  headers: {\n"
+        "    'Content-Type': mimeType,\n"
+        "    'x-amz-acl': 'public-read'\n"
+        "  },\n"
+        "  body: file\n"
+        "});\n"
+        "```"
+    )
+)
+def presign_info():
+    return {
+        "message": "Presign URL usage information",
+        "required_headers": {
+            "Content-Type": "Must match the mime type used in presign request",
+            "x-amz-acl": "Must be 'public-read' to make file publicly accessible"
+        },
+        "example": {
+            "method": "PUT",
+            "headers": {
+                "Content-Type": "image/jpeg",
+                "x-amz-acl": "public-read"
+            }
+        }
+    }
 
 
 @blp.route("/direct", methods=["POST"])
@@ -121,98 +176,47 @@ def upload_direct():
     file = (request.files or {}).get("file")
     if not file:
         abort(422, message="file is required")
-    folder = (request.form or {}).get("folder") or "menus"
     filename = (request.form or {}).get("filename") or getattr(file, "filename", "file.bin")
     mime = (request.form or {}).get("mime") or getattr(file, "mimetype", "application/octet-stream")
 
     try:
-        result = svc.upload_direct(fileobj=file.stream, filename=filename, mime=mime, folder=folder)
+        content_length = getattr(file, "content_length", None)
+        # If Flask didn't provide content_length, try to compute it via seek/tell
+        if content_length is None:
+            try:
+                cur = file.stream.tell()
+                file.stream.seek(0, 2)  # end
+                end = file.stream.tell()
+                file.stream.seek(cur, 0)
+                content_length = end - cur
+            except Exception:
+                content_length = None
+
+        fileobj = file.stream
+        # As a last resort for providers that strictly require Content-Length and stream is not seekable,
+        # we buffer into memory once (only if content_length is still unknown).
+        if content_length is None:
+            try:
+                data = file.read()
+                content_length = len(data)
+                from io import BytesIO
+
+                fileobj = BytesIO(data)
+            except Exception:
+                pass
+
+        result = svc.upload_direct(
+            fileobj=fileobj,
+            filename=filename,
+            mime=mime,
+        )
         return result
     except ValueError as e:
         abort(400, message=str(e))
 
 
-@blp.route("/health", methods=["GET"])
-@require_permissions("menus:update")
-@blp.response(200, UploadsMessageSchema)
-@blp.doc(
-    security=[{"bearerAuth": []}],
-    description="Diagnóstico de conectividad con MinIO/S3 desde el backend",
-)
-def uploads_health():
-    # 1) Ping HTTP de salud de MinIO (si es MinIO)
-    import os
-
-    endpoint = os.getenv("S3_ENDPOINT", "http://localhost:9000").rstrip("/")
-    health_url = f"{endpoint}/minio/health/live"
-    http_ok = None
-    http_status = None
-    try:
-        r = requests.get(health_url, timeout=5)
-        http_ok = r.ok
-        http_status = r.status_code
-    except Exception as e:
-        http_ok = False
-        http_status = str(e)
-
-    # 2) HEAD bucket con boto3 (credenciales/ACL)
-    bucket_ok = None
-    bucket_error = None
-    try:
-        svc.storage.client.head_bucket(Bucket=svc.storage.bucket)
-        bucket_ok = True
-    except Exception as e:
-        bucket_ok = False
-        bucket_error = str(e)
-
-    return {
-        "message": "ok" if http_ok and bucket_ok else "error",
-        "endpoint": endpoint,
-        "health_http_ok": http_ok,
-        "health_http_status": http_status,
-        "bucket": svc.storage.bucket,
-        "head_bucket_ok": bucket_ok,
-        "head_bucket_error": bucket_error,
-    }
-
-
-@blp.route("/bucket-exists", methods=["GET"])
-@require_permissions("menus:update")
-@blp.response(200, UploadsMessageSchema)
-@blp.doc(
-    security=[{"bearerAuth": []}], description="Comprueba existencia del bucket usando MinIO SDK"
-)
-def bucket_exists_check():
-    import os
-
-    endpoint = os.getenv("S3_ENDPOINT", "http://localhost:9000")
-    access_key = os.getenv("S3_ACCESS_KEY", "minio")
-    secret_key = os.getenv("S3_SECRET_KEY", "minio123")
-    bucket = os.getenv("S3_BUCKET", "aralar-media")
-
-    # Parse endpoint for Minio(host:port, secure)
-    secure = False
-    hostport = endpoint
-    if endpoint.startswith("http://") or endpoint.startswith("https://"):
-        u = urlparse(endpoint)
-        secure = u.scheme == "https"
-        hostport = f"{u.hostname}:{u.port or (443 if secure else 80)}"
-
-    try:
-        mc = Minio(hostport, access_key=access_key, secret_key=secret_key, secure=secure)
-        exists = mc.bucket_exists(bucket)
-        return {
-            "message": "exists" if exists else "missing",
-            "bucket": bucket,
-            "endpoint": endpoint,
-        }
-    except Exception as e:
-        abort(400, message=f"minio error: {e}")
-
-
 @blp.route("/bucket-exists-boto", methods=["GET"])
 @require_permissions("menus:update")
-@blp.response(200, UploadsMessageSchema)
 @blp.doc(
     security=[{"bearerAuth": []}],
     description="Comprueba existencia del bucket usando boto3 (head_bucket)",
@@ -220,8 +224,9 @@ def bucket_exists_check():
 def bucket_exists_boto():
     bucket = svc.storage.bucket
     try:
-        svc.storage.client.head_bucket(Bucket=bucket)
-        return {"message": "exists", "bucket": bucket}
+        head = svc.storage.client.head_bucket(Bucket="aralar-media")
+        # Convert 'head' object to string to ensure it's JSON serializable
+        return {"message": "exists", "bucket": bucket, "head": str(head)}
     except ClientError as e:
         code = e.response.get("Error", {}).get("Code") if hasattr(e, "response") else None
         # 404 Not Found => bucket no existe
