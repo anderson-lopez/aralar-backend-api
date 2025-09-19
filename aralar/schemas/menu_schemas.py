@@ -17,6 +17,7 @@ class MenuCommonUpdateSchema(Schema):
 
 class MenuLocaleUpdateSchema(Schema):
     data = fields.Dict(required=True)  # localized subtree for that locale
+    meta = fields.Dict(required=False)
 
 
 # Output schemas
@@ -54,6 +55,7 @@ class PublicAvailableQueryArgs(Schema):
     locale = fields.String(required=True)
     tz = fields.String(load_default="Europe/Madrid")
     date = fields.String(required=False)  # YYYY-MM-DD
+    fallback = fields.String(required=False)
 
 
 class MenuPublicItemSchema(Schema):
@@ -61,6 +63,8 @@ class MenuPublicItemSchema(Schema):
     template_slug = fields.String()
     template_version = fields.Integer()
     updated_at = fields.DateTime(allow_none=True)
+    title = fields.String()
+    summary = fields.String()
 
 
 class MenuPublicAvailableListSchema(Schema):
@@ -72,3 +76,5 @@ class RenderQueryArgs(Schema):
     locale = fields.String(required=True)
     # Optional fallback locale if a key is missing in 'locale'
     fallback = fields.String(required=False)
+    # Optional flag to include UI manifest
+    with_ui = fields.String(required=False)

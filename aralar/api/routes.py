@@ -5,6 +5,7 @@ from .menus.blueprint import blp as menus_blp
 from .menu_templates.blueprint import blp as menu_templates_blp
 from .uploads.blueprint import blp as uploads_blp
 from .i18n.blueprint import blp as i18n_blp
+from .catalogs.blueprint import blp as catalogs_blp
 from flask_smorest import Api
 
 
@@ -20,6 +21,7 @@ def register_blueprints(app):
     api.register_blueprint(menu_templates_blp, url_prefix="/api/menu-templates")
     api.register_blueprint(uploads_blp, url_prefix="/api/uploads")
     api.register_blueprint(i18n_blp, url_prefix="/api/i18n")
+    api.register_blueprint(catalogs_blp, url_prefix="/api/catalogs")
 
     # Almacenar referencia para debugging
     app.api = api

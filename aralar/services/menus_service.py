@@ -46,12 +46,12 @@ class MenusService:
             return None
         return self.repo.update(menu_id, {"common": common})
 
-    def update_locale(self, menu_id: str, locale: str, data: dict):
+    def update_locale(self, menu_id: str, locale: str, data: dict, meta: dict | None = None):
         m = self.repo.get(menu_id)
         if not m:
             return None
         locales = m.get("locales", {})
-        locales[locale] = data
+        locales[locale] = {"data": data, "meta": meta}
         return self.repo.update(menu_id, {"locales": locales})
 
     def publish_locale(self, menu_id: str, locale: str):
@@ -141,7 +141,9 @@ class MenusService:
     def active_now(self, locale: str, tzname: str):
         return self.available_on(locale=locale, tzname=tzname, date_utc=datetime.now(timezone.utc))
 
-    def render(self, menu_id: str, locale: str, fallback: str | None = None):
+    def render(
+        self, menu_id: str, locale: str, fallback: str | None = None, include_ui: bool = False
+    ):
         m = self.repo.get(menu_id)
         if not m:
             abort(404, message="not found")
@@ -153,7 +155,8 @@ class MenusService:
             if not fallback:
                 abort(409, message=f"menu not published for locale={locale}")
 
-        merged = self._merge_menu(m, locale=locale, fallback=fallback)
+        result = self._merge_menu(m, locale=locale, fallback=fallback)
+        data, meta = result["data"], result["meta"]
         payload = {
             "id": str(m["_id"]),
             "tenant_id": m.get("tenant_id"),
@@ -165,11 +168,30 @@ class MenusService:
             "fallback_used": (
                 fallback if (fallback and locale not in m.get("locales", {})) else None
             ),
-            "data": merged,
+            "data": data,
+            "meta": meta,
             "published_at": pub.get(locale, {}).get("published_at")
             or (pub.get(fallback, {}).get("published_at") if fallback else None),
             "updated_at": m.get("updated_at"),
         }
+
+        if include_ui:
+            # Cargar template y construir manifest
+            tmpl = self.templates_repo.get_by_slug_version(
+                m["template_slug"], m["template_version"]
+            )
+            if tmpl:
+                payload["ui"] = {
+                    "layout": (tmpl.get("ui") or {}).get("layout", "sections"),
+                    "sections": [],
+                    "catalogs": (tmpl.get("ui") or {}).get("catalogs", {}),
+                }
+                for sec in tmpl.get("sections", []):
+                    sec_ui = deepcopy(sec.get("ui", {}))
+                    sec_ui["key"] = sec.get("key")
+                    sec_ui["labels"] = sec.get("label", {})
+                    payload["ui"]["sections"].append(sec_ui)
+
         return payload
 
     def _merge_menu(self, menu_doc: dict, locale: str, fallback: str | None = None) -> dict:
@@ -179,8 +201,21 @@ class MenusService:
         loc = locales.get(locale) or (locales.get(fallback) if fallback else None)
         if not loc:
             return common  # si no hay traducción, devolvemos solo common
+        # ¡ojo! tomamos sólo el bloque traducible:
+        loc_data = loc.get("data") or {}
+        if not loc_data and fallback:
+            loc_data = locales.get(fallback, {}).get("data") or {}
+        merged = self._deep_merge_sections(common, loc_data)
+        meta = self._resolve_meta(menu_doc, locale, fallback)
+        return {"data": merged, "meta": meta}
 
-        return self._deep_merge_sections(common, loc)
+    def _resolve_meta(self, menu_doc: dict, locale: str, fallback: str | None = None) -> dict:
+        loc = menu_doc.get("locales", {}).get(locale) or (
+            menu_doc.get("locales", {}).get(fallback) if fallback else None
+        )
+        if not loc:
+            return {}
+        return loc.get("meta", {})
 
     def _deep_merge_sections(self, base, override):
         """
@@ -213,3 +248,11 @@ class MenusService:
 
         # valores atómicos / listas simples
         return override if override is not None else base
+
+    def resolve_meta(self, m, key, locale, fallback: str | None = None):
+        loc = m.get("locales", {})
+        return (
+            (loc.get(locale, {}).get("meta", {}) or {}).get(key)
+            or (loc.get(fallback, {}).get("meta", {}) or {}).get(key)
+            or (m.get("common", {}).get("meta", {}) or {}).get(key)
+        )

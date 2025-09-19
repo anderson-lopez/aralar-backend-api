@@ -144,7 +144,7 @@ def unpublish_menu(menu_id):
 @blp.doc(security=[{"bearerAuth": []}])
 def update_menu_locale(body, menu_id, locale):
     svc = get_svc()
-    doc = svc.update_locale(menu_id, locale, body["data"])
+    doc = svc.update_locale(menu_id, locale, body["data"], body.get("meta"))
     if not doc:
         abort(404, message="not found")
     return {"message": "ok"}
@@ -204,6 +204,7 @@ def public_available(query):
     from zoneinfo import ZoneInfo
 
     locale = query.get("locale")
+    fallback = query.get("fallback")
     tzname = query.get("tz") or "Europe/Madrid"
     date_str = query.get("date")
 
@@ -228,6 +229,8 @@ def public_available(query):
                 "template_slug": x.get("template_slug"),
                 "template_version": x.get("template_version"),
                 "updated_at": x.get("updated_at"),
+                "title": svc.resolve_meta(x, "title", locale, fallback),
+                "summary": svc.resolve_meta(x, "summary", locale, fallback),
             }
             for x in items
         ]
@@ -248,9 +251,10 @@ def render_menu(query, menu_id):
     _abort_if_invalid_id(menu_id)
     locale = query.get("locale")
     fallback = query.get("fallback")
+    include_ui = request.args.get("with_ui") in ("1", "true", "yes")  # <<--- NUEVO
     if not locale:
         abort(400, message="locale is required")
 
     svc = get_svc()
-    payload = svc.render(menu_id, locale=locale, fallback=fallback)
+    payload = svc.render(menu_id, locale=locale, fallback=fallback, include_ui=include_ui)
     return payload
