@@ -41,7 +41,12 @@ Body
       "fields": [
         { "key": "title", "type": "text", "label": {"es-ES":"Título","en-GB":"Title"}, "required": true, "maxLength": 100, "translatable": true },
         { "key": "date",  "type": "date", "label": {"es-ES":"Fecha","en-GB":"Date"}, "required": true, "translatable": false }
-      ]
+      ],
+      "ui": {
+        "role": "header",
+        "order": 0,
+        "display": "hero"
+      }
     },
     {
       "key": "items",
@@ -53,10 +58,27 @@ Body
         { "key": "_id",  "type": "text", "required": true, "translatable": false },
         { "key": "name", "type": "text", "required": true, "maxLength": 120, "translatable": true },
         { "key": "price","type": "price","currency":"EUR","required": true, "translatable": false }
-      ]
+      ],
+      "ui": {
+        "role": "course_list",
+        "order": 10,
+        "display": "list",
+        "hints": {
+          "show_price": true
+        }
+      }
     }
   ],
-  "ui": { "layout": "sections" }
+  "ui": { 
+    "layout": "sections",
+    "catalogs": {
+      "currency": {
+        "code": "EUR",
+        "symbol": "€",
+        "locale": "es-ES"
+      }
+    }
+  }
 }
 ```
 
@@ -168,6 +190,10 @@ Body
       { "_id": "dish-gazpacho", "name": "Gazpacho" },
       { "_id": "dish-tortilla", "name": "Tortilla de patatas" }
     ]
+  },
+  "meta": {
+    "title": "Menú del día",
+    "summary": "Gazpacho y tortilla de patatas · 9,70 € I.V.A. incl."
   }
 }
 ```
@@ -192,6 +218,10 @@ Body
       { "_id": "dish-gazpacho", "name": "Gazpacho" },
       { "_id": "dish-tortilla", "name": "Spanish omelette" }
     ]
+  },
+  "meta": {
+    "title": "Daily Menu",
+    "summary": "Gazpacho and Spanish omelette · €9.70 VAT incl."
   }
 }
 ```
@@ -262,6 +292,8 @@ Respuesta (200)
       "id": "64f1a1333333333333333333",
       "template_slug": "daily-basic",
       "template_version": 1,
+      "title": "Menú del día",
+      "summary": "Gazpacho y tortilla de patatas · 9,70 € I.V.A. incl.",
       "updated_at": "2025-09-01T09:30:00Z"
     }
   ]
@@ -289,6 +321,10 @@ Respuesta (200) (ejemplo)
   "fallback_used": null,
   "published_at": "2025-09-01T10:00:00Z",
   "updated_at": "2025-09-01T09:30:00Z",
+  "meta": {
+    "title": "Menú del día",
+    "summary": "Gazpacho y tortilla de patatas · 9,70 € I.V.A. incl."
+  },
   "data": {
     "header": {
       "title": "Menú del día",
@@ -305,6 +341,66 @@ Respuesta (200) (ejemplo)
 > Si ES no estuviera publicado pero EN sí, podrías usar:
 > `/render?locale=es-ES&fallback=en-GB` → devolverá datos en EN y `fallback_used: "en-GB"`.
 
+### Con UI Manifest (with_ui=1)
+
+GET `/api/menus/64f1a1333333333333333333/render?locale=es-ES&with_ui=1`
+
+Respuesta (200) con UI manifest completo:
+```json
+{
+  "id": "64f1a1333333333333333333",
+  "tenant_id": "aralar",
+  "template": { "slug": "daily-basic", "version": 1 },
+  "locale": "es-ES",
+  "fallback_used": null,
+  "published_at": "2025-09-01T10:00:00Z",
+  "updated_at": "2025-09-01T09:30:00Z",
+  "ui": {
+    "layout": "sections",
+    "sections": [
+      {
+        "key": "header",
+        "role": "header",
+        "order": 0,
+        "display": "hero",
+        "labels": { "es-ES": "Cabecera" }
+      },
+      {
+        "key": "items",
+        "role": "course_list",
+        "order": 10,
+        "display": "list",
+        "labels": { "es-ES": "Platos" },
+        "hints": {
+          "show_price": true
+        }
+      }
+    ],
+    "catalogs": {
+      "currency": {
+        "code": "EUR",
+        "symbol": "€",
+        "locale": "es-ES"
+      }
+    }
+  },
+  "meta": {
+    "title": "Menú del día",
+    "summary": "Gazpacho y tortilla de patatas · 9,70 € I.V.A. incl."
+  },
+  "data": {
+    "header": {
+      "title": "Menú del día",
+      "date": "2025-09-05"
+    },
+    "items": [
+      { "_id": "dish-gazpacho", "name": "Gazpacho", "price": 5.5 },
+      { "_id": "dish-tortilla", "name": "Tortilla de patatas", "price": 4.2 }
+    ]
+  }
+}
+```
+
 ---
 
 ## (Opcional) cURL de ejemplo (rápido)
@@ -315,5 +411,70 @@ Respuesta (200) (ejemplo)
 # 1) Create template
 curl -X POST http://localhost:5000/api/menu-templates \
  -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
- -d '{ "name":"Menú del día básico", "slug":"daily-basic", "tenant_id":"aralar", "version":1, "status":"draft", "i18n":{"default_locale":"es-ES","locales":["es-ES","en-GB"]}, "sections":[{"key":"header","label":{"es-ES":"Cabecera","en-GB":"Header"},"repeatable":false,"fields":[{"key":"title","type":"text","required":true,"translatable":true},{"key":"date","type":"date","required":true,"translatable":false}]},{"key":"items","label":{"es-ES":"Platos","en-GB":"Dishes"},"repeatable":true,"fields":[{"key":"_id","type":"text","required":true,"translatable":false},{"key":"name","type":"text","required":true,"translatable":true},{"key":"price","type":"price","currency":"EUR","required":true,"translatable":false}]}] }'
+ -d '{ "name":"Menú del día básico", "slug":"daily-basic", "tenant_id":"aralar", "version":1, "status":"draft", "i18n":{"default_locale":"es-ES","locales":["es-ES","en-GB"]}, "sections":[{"key":"header","label":{"es-ES":"Cabecera","en-GB":"Header"},"repeatable":false,"fields":[{"key":"title","type":"text","required":true,"translatable":true},{"key":"date","type":"date","required":true,"translatable":false}],"ui":{"role":"header","order":0,"display":"hero"}},{"key":"items","label":{"es-ES":"Platos","en-GB":"Dishes"},"repeatable":true,"fields":[{"key":"_id","type":"text","required":true,"translatable":false},{"key":"name","type":"text","required":true,"translatable":true},{"key":"price","type":"price","currency":"EUR","required":true,"translatable":false}],"ui":{"role":"course_list","order":10,"display":"list","hints":{"show_price":true}}}], "ui":{"layout":"sections","catalogs":{"currency":{"code":"EUR","symbol":"€","locale":"es-ES"}}} }'
 ```
+
+---
+
+## 🆕 Nuevas Funcionalidades Implementadas
+
+### **1. UI Properties por Sección**
+
+Cada sección del template ahora incluye propiedades `ui`:
+
+- **`role`**: Tipo de sección (`header`, `course_list`, `extras`, `price_footer`, etc.)
+- **`order`**: Orden de renderizado (0, 10, 20, etc.)
+- **`display`**: Modo de visualización (`hero`, `list`, `bullets`, `footer_price`, etc.)
+- **`hints`**: Configuraciones específicas (`show_price`, `choose_count`, `scope`)
+
+### **2. Metadatos (Meta)**
+
+Las localizaciones ahora incluyen metadatos traducibles:
+
+- **`meta.title`**: Título para listados públicos
+- **`meta.summary`**: Resumen descriptivo con información clave (precio, contenido)
+
+### **3. UI Manifest Completo**
+
+El template incluye configuración global de UI:
+
+- **`ui.layout`**: Tipo de layout (`sections`)
+- **`ui.catalogs`**: Catálogos de referencia (currency, allergens, etc.)
+
+### **4. Endpoints Mejorados**
+
+- **`/public/available`**: Ahora incluye `title` y `summary` de los metadatos
+- **`/render?with_ui=1`**: Incluye UI manifest completo para renderizado frontend
+- **Fallback automático**: Resolución inteligente de idiomas con respaldo
+
+### **5. Estructura de Datos Optimizada**
+
+- **Common**: Datos estructurales no traducibles
+- **Locales.data**: Contenido traducible
+- **Locales.meta**: Metadatos traducibles (título, resumen)
+
+---
+
+## 🎯 Beneficios del Nuevo Sistema
+
+### **🔧 Frontend Agnóstico**
+- El UI manifest guía el renderizado automático
+- No necesitas hardcodear la estructura en el frontend
+- Fácil adaptación a nuevos tipos de menú
+
+### **📊 Listados Optimizados**
+- Solo se transfieren título y resumen en listados
+- Mejor performance y experiencia de usuario
+- Información clave visible sin cargar todo el menú
+
+### **🌍 Multiidioma Completo**
+- Metadatos traducibles independientes del contenido
+- Fallback inteligente entre idiomas
+- Gestión centralizada de traducciones
+
+### **⚡ Escalabilidad**
+- Estructura extensible para nuevos campos
+- Versionado independiente de templates
+- Fácil mantenimiento y evolución
+
+Este sistema actualizado mantiene la simplicidad del menú básico mientras incorpora las nuevas capacidades avanzadas de UI y metadatos. 🎉

@@ -80,7 +80,12 @@ Body
       "fields": [
         { "key": "title", "type": "text", "required": true, "translatable": true },
         { "key": "banner_image", "type": "image", "required": true, "translatable": false }
-      ]
+      ],
+      "ui": {
+        "role": "header",
+        "order": 0,
+        "display": "hero"
+      }
     },
     {
       "key": "dishes",
@@ -92,9 +97,27 @@ Body
         { "key": "price", "type": "price", "currency": "EUR", "required": true, "translatable": false },
         { "key": "image", "type": "image", "required": false, "translatable": false },
         { "key": "image_alt", "type": "text", "required": false, "translatable": true, "maxLength": 140 }
-      ]
+      ],
+      "ui": {
+        "role": "course_list",
+        "order": 10,
+        "display": "grid",
+        "hints": {
+          "show_price": true
+        }
+      }
     }
-  ]
+  ],
+  "ui": {
+    "layout": "sections",
+    "catalogs": {
+      "currency": {
+        "code": "EUR",
+        "symbol": "€",
+        "locale": "es-ES"
+      }
+    }
+  }
 }
 ```
 
@@ -202,6 +225,10 @@ Body
       { "_id": "dish-ensalada", "name": "Ensalada fresca", "image_alt": "Ensalada con ingredientes de temporada" },
       { "_id": "dish-sopa", "name": "Sopa del día" }
     ]
+  },
+  "meta": {
+    "title": "Menú sencillo con fotos",
+    "summary": "Ensalada fresca y sopa del día · 11,00 € I.V.A. incl."
   }
 }
 ```
@@ -217,6 +244,10 @@ Body
       { "_id": "dish-ensalada", "name": "Fresh salad", "image_alt": "Seasonal ingredient salad" },
       { "_id": "dish-sopa", "name": "Soup of the day" }
     ]
+  },
+  "meta": {
+    "title": "Simple photo menu",
+    "summary": "Fresh salad and soup of the day · €11.00 VAT incl."
   }
 }
 ```
@@ -295,6 +326,8 @@ Respuesta (200)
       "id": "6710a1000000000000000003",
       "template_slug": "simple-photo",
       "template_version": 1,
+      "title": "Menú sencillo con fotos",
+      "summary": "Ensalada fresca y sopa del día · 11,00 € I.V.A. incl.",
       "updated_at": "2025-09-01T09:30:00Z"
     }
   ]
@@ -313,6 +346,84 @@ Respuesta (200)
   "id": "6710a1000000000000000003",
   "template": { "slug": "simple-photo", "version": 1 },
   "locale": "es-ES",
+  "meta": {
+    "title": "Menú sencillo con fotos",
+    "summary": "Ensalada fresca y sopa del día · 11,00 € I.V.A. incl."
+  },
+  "data": {
+    "header": {
+      "title": "Menú sencillo con fotos",
+      "banner_image": {
+        "url": "https://cdn.example.com/menus/banners/uuid-banner.webp",
+        "mime": "image/webp",
+        "width": 1600,
+        "height": 600,
+        "size": 210000
+      }
+    },
+    "dishes": [
+      {
+        "_id": "dish-ensalada",
+        "name": "Ensalada fresca",
+        "price": 6.0,
+        "image": {
+          "url": "https://cdn.example.com/menus/dishes/uuid-ensalada.webp",
+          "mime": "image/webp",
+          "width": 1200,
+          "height": 900,
+          "size": 180000
+        },
+        "image_alt": "Ensalada con ingredientes de temporada"
+      },
+      { "_id": "dish-sopa", "name": "Sopa del día", "price": 5.0 }
+    ]
+  }
+}
+```
+
+### Con UI Manifest (with_ui=1)
+
+GET `/api/menus/6710a1000000000000000003/render?locale=es-ES&with_ui=1`
+
+Respuesta (200) con UI manifest completo:
+```json
+{
+  "id": "6710a1000000000000000003",
+  "template": { "slug": "simple-photo", "version": 1 },
+  "locale": "es-ES",
+  "ui": {
+    "layout": "sections",
+    "sections": [
+      {
+        "key": "header",
+        "role": "header",
+        "order": 0,
+        "display": "hero",
+        "labels": { "es-ES": "Cabecera" }
+      },
+      {
+        "key": "dishes",
+        "role": "course_list",
+        "order": 10,
+        "display": "grid",
+        "labels": { "es-ES": "Platos" },
+        "hints": {
+          "show_price": true
+        }
+      }
+    ],
+    "catalogs": {
+      "currency": {
+        "code": "EUR",
+        "symbol": "€",
+        "locale": "es-ES"
+      }
+    }
+  },
+  "meta": {
+    "title": "Menú sencillo con fotos",
+    "summary": "Ensalada fresca y sopa del día · 11,00 € I.V.A. incl."
+  },
   "data": {
     "header": {
       "title": "Menú sencillo con fotos",
@@ -356,3 +467,74 @@ curl -X POST http://localhost:5000/api/menus \
  -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
  -d '{ "tenant_id":"aralar","template_slug":"simple-photo","template_version":1,"status":"draft","common":{"header":{"banner_image":{"url":"https://cdn.example.com/menus/banners/uuid-banner.webp","mime":"image/webp","width":1600,"height":600,"size":210000}},"dishes":[{"_id":"dish-ensalada","price":6.0,"image":{"url":"https://cdn.example.com/menus/dishes/uuid-ensalada.webp","mime":"image/webp","width":1200,"height":900,"size":180000}},{"_id":"dish-sopa","price":5.0}]}}'
 ```
+
+---
+
+## 🆕 Nuevas Funcionalidades Implementadas
+
+### **1. UI Properties por Sección**
+
+Cada sección del template ahora incluye propiedades `ui`:
+
+- **Header**: `role: "header"`, `order: 0`, `display: "hero"` - Ideal para banners con imágenes
+- **Dishes**: `role: "course_list"`, `order: 10`, `display: "grid"` - Layout en cuadrícula para mostrar imágenes de platos
+- **`hints.show_price`**: Controla si se muestran los precios en la UI
+
+### **2. Metadatos (Meta) con Imágenes**
+
+Las localizaciones incluyen metadatos optimizados para menús con fotos:
+
+- **`meta.title`**: Título descriptivo para listados
+- **`meta.summary`**: Resumen con precios totales y descripción del contenido
+- **Multiidioma**: Metadatos traducibles independientes del contenido visual
+
+### **3. UI Manifest para Contenido Visual**
+
+El template incluye configuración específica para menús con imágenes:
+
+- **`display: "grid"`**: Layout optimizado para mostrar imágenes de platos
+- **`display: "hero"`**: Header con banner de imagen destacada
+- **Catálogos de currency**: Información de moneda para precios
+
+### **4. Endpoints Mejorados para Contenido Visual**
+
+- **`/public/available`**: Incluye título y resumen para preview sin cargar imágenes
+- **`/render?with_ui=1`**: UI manifest completo con instrucciones de layout para imágenes
+- **Optimización de carga**: Metadatos ligeros para listados, contenido completo para renderizado
+
+### **5. Estructura Optimizada para Imágenes**
+
+- **Common**: URLs de imágenes, dimensiones y metadatos técnicos
+- **Locales.data**: Textos alternativos (alt) traducibles para accesibilidad
+- **Locales.meta**: Títulos y resúmenes traducibles para SEO y listados
+
+---
+
+## 🎯 Beneficios para Menús con Imágenes
+
+### **📸 Gestión de Imágenes Optimizada**
+- URLs presignadas para subida segura de imágenes
+- Metadatos técnicos (dimensiones, tamaño, MIME) incluidos
+- Textos alternativos traducibles para accesibilidad
+
+### **🎨 UI Responsiva y Atractiva**
+- Layout en cuadrícula para mostrar platos con imágenes
+- Header hero para banners impactantes
+- Configuración flexible de visualización de precios
+
+### **⚡ Performance Optimizada**
+- Listados ligeros con solo título y resumen
+- Carga progresiva: metadatos primero, imágenes después
+- UI manifest guía el renderizado eficiente
+
+### **🌍 Accesibilidad y SEO**
+- Textos alternativos traducibles para imágenes
+- Metadatos estructurados para mejor indexación
+- Soporte completo multiidioma incluyendo descripciones visuales
+
+### **🔧 Integración con CDN**
+- URLs públicas optimizadas para CDN
+- Soporte para múltiples formatos de imagen (WebP, JPEG, PNG)
+- Metadatos técnicos para optimización automática
+
+Este sistema proporciona una base sólida para menús con contenido visual rico, manteniendo la performance y accesibilidad mientras ofrece una experiencia de usuario atractiva. 🎉
