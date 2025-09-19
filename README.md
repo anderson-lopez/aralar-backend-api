@@ -19,109 +19,169 @@ Una API REST moderna construida con Flask para gestión de usuarios, roles y per
 - MongoDB (local o Docker)
 - Git
 
-## 🛠️ Instalación en Windows
+## 🛠️ Instalación y Despliegue
 
-### 1. Clonar el repositorio
+### 🐳 Opción A: Docker (Recomendado)
+
+La forma más rápida y sencilla de ejecutar la aplicación:
+
+#### 1. Clonar el repositorio
 
 ```bash
 git clone <tu-repositorio>
 cd aralar-api
 ```
 
-### 2. Crear entorno virtual
+#### 2. Inicio rápido con Docker
 
+**En Windows:**
 ```bash
-python -m venv .venv
-.venv\Scripts\activate
+docker-start.bat
 ```
 
-### 3. Instalar dependencias
+**En Linux/macOS:**
+```bash
+chmod +x docker-start.sh
+./docker-start.sh
+```
+
+**O manualmente:**
+```bash
+# Copiar configuración de ejemplo
+copy .env.example .env  # Windows
+cp .env.example .env    # Linux/macOS
+
+# Editar .env con tus configuraciones (ver sección de variables de entorno)
+
+# Construir e iniciar servicios
+docker-compose up --build -d
+
+# Inicializar base de datos
+docker-compose exec api python scripts/migrate.py
+docker-compose exec api python scripts/seed.py
+```
+
+#### 3. Verificar que todo funciona
+
+- **API**: http://localhost:8000
+- **Documentación Swagger**: http://localhost:8000/api/docs/swagger-ui
+- **MongoDB**: localhost:27017
+
+### 💻 Opción B: Instalación Local (Desarrollo)
+
+#### 1. Requisitos previos
+- Python 3.8+
+- MongoDB (local o Docker)
+- Git
+
+#### 2. Configurar entorno
 
 ```bash
+# Crear entorno virtual
+python -m venv .venv
+.venv\Scripts\activate  # Windows
+source .venv/bin/activate  # Linux/macOS
+
+# Instalar dependencias
 pip install -r requirements.txt
 ```
 
-### 4. Configurar variables de entorno
+#### 3. Configurar variables de entorno
 
 ```bash
 copy .env.example .env
 ```
 
-Edita el archivo `.env` con tus configuraciones:
-
+**Para desarrollo local, cambiar en `.env`:**
 ```env
 FLASK_ENV=development
-SECRET_KEY=tu_clave_secreta_aqui
-JWT_SECRET_KEY=tu_jwt_secret_aqui
 MONGO_URI=mongodb://localhost:27017/aralar
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
-RATE_LIMIT_DEFAULT=100/hour
-SECURE_COOKIES=false
-SEED_ADMIN_EMAIL=admin@aralar.local
-SEED_ADMIN_PASSWORD=TuPasswordSegura123!
-SEED_ADMIN_FULLNAME="Admin Aralar"
 ```
 
-### 5. Configurar MongoDB
-
-#### Opción A: MongoDB Local
+#### 4. Configurar MongoDB local
 
 1. Descargar e instalar [MongoDB Community Server](https://www.mongodb.com/try/download/community)
 2. Iniciar el servicio MongoDB
 3. Crear la base de datos `aralar`
 
-#### Opción B: Docker (Recomendado)
+#### 5. Inicializar la base de datos
 
 ```bash
-docker-compose up -d mongo
-```
-
-### 6. Inicializar la base de datos
-
-```bash
-python scripts/seed.py
 python scripts/migrate.py
+python scripts/seed.py
 ```
 
-Este script creará:
-
-- Índices necesarios
-- Catálogo de permisos
-- Roles base (admin, manager, staff)
-- Usuario administrador inicial
-
-## 🚀 Ejecutar la aplicación
-
-### Desarrollo
+#### 6. Ejecutar la aplicación
 
 ```bash
-# Activar entorno virtual
-.venv\Scripts\activate
-
-# Ejecutar con Flask (desarrollo)
+# Desarrollo
 flask --app aralar.app run --debug
 
-# O ejecutar con Python
-python -m flask --app aralar.app run --debug
+# Producción local
+gunicorn -c gunicorn.conf.py wsgi:app
 ```
 
-### Producción
+## 🔧 Variables de Entorno
+
+Edita el archivo `.env` con tus configuraciones:
+
+```env
+# Configuración de Flask
+FLASK_ENV=production  # o 'development' para desarrollo local
+SECRET_KEY=tu_clave_secreta_super_segura_aqui
+JWT_SECRET_KEY=tu_jwt_secret_key_aqui
+
+# Base de datos MongoDB
+MONGO_URI=mongodb://mongo:27017/aralar  # Para Docker
+# MONGO_URI=mongodb://localhost:27017/aralar  # Para desarrollo local
+
+# CORS - Orígenes permitidos
+CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+
+# Seguridad
+SECURE_COOKIES=false  # true en producción con HTTPS
+TALISMAN_FORCE_HTTPS=false  # true en producción
+
+# Datos del administrador inicial
+SEED_ADMIN_EMAIL=admin@aralar.local
+SEED_ADMIN_PASSWORD=TuPasswordSegura123!
+SEED_ADMIN_FULLNAME="Admin Aralar"
+```
+
+## 🐳 Comandos Docker Útiles
 
 ```bash
-# Con Gunicorn
-gunicorn -c gunicorn.conf.py wsgi:app
+# Ver logs en tiempo real
+docker-compose logs -f
 
-# Con Docker
-docker-compose up --build
+# Ver logs de un servicio específico
+docker-compose logs -f api
+docker-compose logs -f mongo
+
+# Reiniciar servicios
+docker-compose restart
+
+# Detener servicios
+docker-compose down
+
+# Detener y eliminar volúmenes (¡cuidado! elimina datos de BD)
+docker-compose down -v
+
+# Reconstruir imágenes
+docker-compose build --no-cache
+
+# Ejecutar comandos dentro del contenedor
+docker-compose exec api python scripts/seed.py
+docker-compose exec mongo mongosh aralar
 ```
 
 ## 📚 Documentación de la API
 
 Una vez ejecutando la aplicación, accede a:
 
-- **Swagger UI**: http://localhost:5000/api/docs/swagger-ui
-- **ReDoc**: http://localhost:5000/api/docs/redoc
-- **OpenAPI JSON**: http://localhost:5000/api/docs/openapi.json
+- **Swagger UI**: http://localhost:8000/api/docs/swagger-ui
+- **ReDoc**: http://localhost:8000/api/docs/redoc
+- **OpenAPI JSON**: http://localhost:8000/api/docs/openapi.json
 
 ## 🔐 Endpoints Principales
 
