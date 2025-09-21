@@ -8,6 +8,15 @@ def init_api_docs(app):
     app.config["OPENAPI_REDOC_PATH"] = "/redoc"
     app.config["OPENAPI_REDOC_URL"] = "https://cdn.jsdelivr.net/npm/redoc/bundles/redoc.standalone.js"
     
+    # Configuración de Swagger UI para persistir autorización
+    app.config["OPENAPI_SWAGGER_UI_CONFIG"] = {
+        "persistAuthorization": True,  # Mantiene el token entre recargas
+        "displayRequestDuration": True,  # Muestra duración de requests
+        "tryItOutEnabled": True,  # Habilita el botón "Try it out"
+        "filter": True,  # Habilita filtro de endpoints
+        "deepLinking": True,  # URLs directas a endpoints específicos
+    }
+    
     # Configurar JWT Bearer authentication para Swagger UI
     app.config["API_SPEC_OPTIONS"] = {
         "components": {

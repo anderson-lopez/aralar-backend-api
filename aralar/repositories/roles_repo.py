@@ -37,3 +37,7 @@ class RolesRepo:
     def resolve_roles(self, role_names: List[str]):
         cur = self.roles.find({"name": {"$in": role_names}})
         return list(cur)
+
+    def delete_role(self, name: str) -> int:
+        res = self.roles.delete_one({"name": name})
+        return res.deleted_count

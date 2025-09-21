@@ -1,0 +1,79 @@
+# Archivos de desarrollo
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+htmlcov/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Documentación
+*.md
+docs/
+
+# Datos temporales
+.minio/
+mongo_data/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Otros
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+data/
