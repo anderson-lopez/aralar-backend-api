@@ -51,6 +51,7 @@ class I18nService:
                 self.cache.put(
                     h,
                     {
+                        "tenant_id": tenant_id,
                         "source_text": texts[pos],
                         "source_lang": src or src_detected,
                         "target_lang": tgt,

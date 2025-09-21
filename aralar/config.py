@@ -14,6 +14,9 @@ class BaseConfig:
     # i18n / translation providers
     I18N_PROVIDER = os.getenv("I18N_PROVIDER", "deepl").lower()
     DEEPL_API_KEY = os.getenv("DEEPL_API_KEY", "")
+    DEEPL_BASE_URL = os.getenv("DEEPL_BASE_URL", "https://api.deepl.com/v2")
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+    GOOGLE_BASE_URL = os.getenv("GOOGLE_BASE_URL", "https://translation.googleapis.com/language/translate/v2")
     # S3 / object storage
     S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://localhost:9000")
     S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "minio")

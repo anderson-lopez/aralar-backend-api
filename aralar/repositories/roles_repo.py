@@ -5,8 +5,6 @@ class RolesRepo:
     def __init__(self, db):
         self.roles = db["roles"]
         self.permissions = db["permissions"]
-        self.roles.create_index("name", unique=True)
-        self.permissions.create_index("name", unique=True)
 
     def upsert_role(self, name: str, permissions: List[str], description: str = ""):
         self.roles.update_one(

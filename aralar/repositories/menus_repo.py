@@ -5,10 +5,6 @@ from datetime import datetime
 class MenusRepo:
     def __init__(self, db):
         self.col = db["menus"]
-        self.col.create_index([("tenant_id", 1)])
-        self.col.create_index([("template_slug", 1), ("template_version", 1)])
-        self.col.create_index([("status", 1)])
-        # índices de availability ya los cubrimos antes
 
     def insert(self, doc: dict):
         doc["created_at"] = doc.get("created_at") or datetime.utcnow()

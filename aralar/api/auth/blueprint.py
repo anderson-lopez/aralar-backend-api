@@ -80,6 +80,7 @@ def me():
         "permissions": claims.get("permissions", []),
     }
 
+
 @blp.route("/register", methods=["POST"])
 @blp.arguments(RegisterSchema)
 @blp.response(201, RegisterResponseSchema)
@@ -91,15 +92,13 @@ def register(register_data):
         users_svc = UsersService(UsersRepo(current_app.mongo_db))
         auth_svc = AuthService(users_svc)
         user_id = auth_svc.register(register_data)
-        
-        return {
-            "message": "User registered successfully",
-            "user_id": str(user_id)
-        }
+
+        return {"message": "User registered successfully", "user_id": str(user_id)}
     except ValueError as e:
         abort(400, message=str(e), error="validation_error")
     except Exception as e:
         abort(400, message="Registration failed", error="registration_error")
+
 
 @blp.route("/change-password", methods=["PUT"])
 @blp.arguments(ChangePasswordSchema)
@@ -115,11 +114,11 @@ def change_password(change_password_data):
     # Obtener claims del JWT
     claims = get_jwt()
     user_id = get_jwt_identity()
-    
+
     try:
         users_svc = UsersService(UsersRepo(current_app.mongo_db))
         users_svc.change_password(user_id, change_password_data)
-        
+
         return {"message": "Password changed successfully"}
     except ValueError as e:
         abort(400, message=str(e), error="validation_error")

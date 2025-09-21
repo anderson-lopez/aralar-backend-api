@@ -5,7 +5,6 @@ from hashlib import sha1
 class TranslationsRepo:
     def __init__(self, db):
         self.col = db["translations_cache"]
-        self.col.create_index([("hash", 1)], unique=True)
 
     @staticmethod
     def make_hash(text: str, src: str, tgt: str, provider: str, glossary_version: int | None):
@@ -14,6 +13,20 @@ class TranslationsRepo:
 
     def get(self, h: str):
         return self.col.find_one({"hash": h})
+
+    def get_by_tenant(self, tenant_id: str, limit: int = 100):
+        """Obtiene traducciones recientes de un tenant específico"""
+        return list(self.col.find(
+            {"tenant_id": tenant_id}
+        ).sort("created_at", -1).limit(limit))
+
+    def count_by_tenant(self, tenant_id: str):
+        """Cuenta las traducciones en cache de un tenant"""
+        return self.col.count_documents({"tenant_id": tenant_id})
+
+    def clear_tenant_cache(self, tenant_id: str):
+        """Limpia el cache de traducciones de un tenant específico"""
+        return self.col.delete_many({"tenant_id": tenant_id})
 
     def put(self, h: str, doc: dict):
         doc["hash"] = h

@@ -1,4 +1,5 @@
 import requests
+import re
 
 
 class I18nProvider:
@@ -13,24 +14,68 @@ class I18nProvider:
 
 # ---- DeepL ----
 class DeepLProvider(I18nProvider):
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, base_url: str = "https://api.deepl.com/v2"):
         self.key = api_key
-        self.base = "https://api.deepl.com/v2"
+        self.base = base_url.rstrip('/')
+
+    def apply_local_glossary(self, texts, glossary):
+        """Aplica glosario local ANTES de enviar a DeepL"""
+        if not glossary or not glossary.get("pairs"):
+            return texts
+        
+        processed_texts = []
+        for text in texts:
+            processed_text = text
+            # Aplicar cada par del glosario
+            for pair in glossary["pairs"]:
+                for source_term, target_term in pair.items():
+                    # Reemplazar términos completos (no parciales)
+                    pattern = r'\b' + re.escape(source_term) + r'\b'
+                    processed_text = re.sub(pattern, target_term, processed_text, flags=re.IGNORECASE)
+            processed_texts.append(processed_text)
+        
+        return processed_texts
+    
+    def restore_glossary_terms(self, translated_texts, original_texts, glossary):
+        """Asegura que los términos del glosario se mantuvieron en la traducción"""
+        if not glossary or not glossary.get("pairs"):
+            return translated_texts
+        
+        restored_texts = []
+        for i, translated in enumerate(translated_texts):
+            restored_text = translated
+            # Verificar que los términos del glosario se mantuvieron
+            for pair in glossary["pairs"]:
+                for source_term, target_term in pair.items():
+                    # Si el término original contenía un término del glosario
+                    if re.search(r'\b' + re.escape(source_term) + r'\b', original_texts[i], re.IGNORECASE):
+                        # Asegurar que el término traducido esté en el resultado
+                        if target_term.lower() not in restored_text.lower():
+                            # Si DeepL no respetó nuestro glosario, forzar el reemplazo
+                            pattern = r'\b' + re.escape(source_term) + r'\b'
+                            restored_text = re.sub(pattern, target_term, restored_text, flags=re.IGNORECASE)
+            restored_texts.append(restored_text)
+        
+        return restored_texts
 
     def translate(self, src, tgt, texts, glossary=None):
-        # DeepL acepta source_lang opcional; target obligatorio
+        # 1. Aplicar glosario local ANTES de enviar a DeepL
+        processed_texts = self.apply_local_glossary(texts, glossary)
+        
+        # 2. Preparar datos para DeepL
         data = {
             "target_lang": tgt,
         }
         if src:
             data["source_lang"] = src
-        for t in texts:
+        for t in processed_texts:
             data.setdefault("text", []).append(t)
 
-        # glossario: con DeepL hay "glossary_id" si lo creaste
+        # 3. Glosario de DeepL (si existe)
         if glossary and glossary.get("deepl_glossary_id"):
             data["glossary_id"] = glossary["deepl_glossary_id"]
 
+        # 4. Llamar a DeepL
         r = requests.post(
             f"{self.base}/translate",
             data=data,
@@ -38,9 +83,13 @@ class DeepLProvider(I18nProvider):
         )
         r.raise_for_status()
         js = r.json()
-        out = [x["text"] for x in js.get("translations", [])]
+        translated_texts = [x["text"] for x in js.get("translations", [])]
+        
+        # 5. Restaurar términos del glosario si DeepL los cambió
+        final_texts = self.restore_glossary_terms(translated_texts, texts, glossary)
+        
         src_out = js.get("translations", [{}])[0].get("detected_source_language", src or "")
-        return src_out, out
+        return src_out, final_texts
 
     def detect(self, texts):
         # DeepL no tiene “detect” dedicado; podemos traducir a mismo idioma o usar heurística simple.
@@ -51,6 +100,10 @@ class DeepLProvider(I18nProvider):
 
 # ---- Google v3 (esquema) ----
 class GoogleProvider(I18nProvider):
+    def __init__(self, api_key: str = "", base_url: str = "https://translation.googleapis.com/language/translate/v2"):
+        self.key = api_key
+        self.base = base_url.rstrip('/')
+    
     # Aquí iría el cliente oficial de Google (google-cloud-translate).
     # Omitido por brevedad; la interfase es la misma que la de DeepL.
     pass
@@ -58,8 +111,18 @@ class GoogleProvider(I18nProvider):
 
 def get_provider(config):
     p = (config.get("I18N_PROVIDER") or "deepl").lower()
+    
     if p == "deepl":
-        return DeepLProvider(config.get("DEEPL_API_KEY", ""))
+        api_key = config.get("DEEPL_API_KEY", "")
+        base_url = config.get("DEEPL_BASE_URL", "https://api.deepl.com/v2")
+        return DeepLProvider(api_key, base_url)
+    
     if p == "google":
-        return GoogleProvider()
-    return DeepLProvider(config.get("DEEPL_API_KEY", ""))
+        api_key = config.get("GOOGLE_API_KEY", "")
+        base_url = config.get("GOOGLE_BASE_URL", "https://translation.googleapis.com/language/translate/v2")
+        return GoogleProvider(api_key, base_url)
+    
+    # Default fallback
+    api_key = config.get("DEEPL_API_KEY", "")
+    base_url = config.get("DEEPL_BASE_URL", "https://api.deepl.com/v2")
+    return DeepLProvider(api_key, base_url)
