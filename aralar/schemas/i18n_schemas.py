@@ -26,21 +26,43 @@ class TranslateRequestSchema(Schema):
     source_lang = fields.String(
         required=False,
         validate=validate.OneOf([
-            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar", "auto"
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar", "auto",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
         ]),
         metadata={
-            "description": "Idioma de origen (opcional, se detecta automáticamente)",
-            "example": "es"
+            "description": "Idioma de origen (opcional, se detecta automáticamente). Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "eu"
         }
     )
     target_lang = fields.String(
         required=True,
         validate=validate.OneOf([
-            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar"
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
         ]),
         metadata={
-            "description": "Idioma de destino",
-            "example": "en"
+            "description": "Idioma de destino. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "es"
         }
     )
     tenant_id = fields.String(
@@ -115,18 +137,44 @@ class GlossaryUpsertSchema(Schema):
     )
     source_lang = fields.String(
         required=True,
-        validate=validate.OneOf(["es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar"]),
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
         metadata={
-            "description": "Idioma de origen del glosario",
-            "example": "es"
+            "description": "Idioma de origen del glosario. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "eu"
         }
     )
     target_lang = fields.String(
         required=True,
-        validate=validate.OneOf(["es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar"]),
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
         metadata={
-            "description": "Idioma de destino del glosario",
-            "example": "en"
+            "description": "Idioma de destino del glosario. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "es"
         }
     )
     pairs = fields.List(
@@ -151,18 +199,44 @@ class GlossaryQuerySchema(Schema):
     )
     source_lang = fields.String(
         required=True,
-        validate=validate.OneOf(["es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar"]),
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
         metadata={
-            "description": "Idioma de origen del glosario",
-            "example": "es"
+            "description": "Idioma de origen del glosario. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "eu"
         }
     )
     target_lang = fields.String(
         required=True,
-        validate=validate.OneOf(["es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar"]),
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
         metadata={
-            "description": "Idioma de destino del glosario",
-            "example": "en"
+            "description": "Idioma de destino del glosario. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "es"
         }
     )
 
