@@ -28,8 +28,10 @@ Esta guía explica cómo el frontend debe interpretar y renderizar los menús us
   name: string,           // text, trans - Nombre del plato
   description?: string,   // textarea/rich_text, trans - Descripción opcional
   price?: number,         // price, no trans - Precio (si el diseño lo requiere)
-  image?: ImageData,      // image, no trans - Foto del plato
-  image_alt?: string,     // text, trans - Alt text de la imagen
+  image?: ImageData,      // image, no trans - Foto del plato (legacy)
+  image_alt?: string,     // text, trans - Alt text de la imagen (legacy)
+  images?: ImageData[],   // array de images, no trans - Múltiples fotos del plato
+  images_alt?: string[],  // array de texts, trans - Alt texts por índice con images[]
   allergens?: string[],   // tags, no trans - Códigos del catálogo de alérgenos
   badges?: string[]       // tags/enum, no trans - spicy, vegan, gluten_free, etc.
 }
@@ -55,15 +57,22 @@ Esta guía explica cómo el frontend debe interpretar y renderizar los menús us
 
 ### Diferenciación Semántica de Imágenes
 
-#### **¿Por qué `banner_image` vs `image`?**
+#### **¿Por qué `banner_image` vs `image` vs `images`?**
 
 - **`banner_image`** en header → Denota contexto de "hero/header" (1:1, imagen principal)
-- **`image`** en items → Genérico por elemento (múltiples, galería de platos)
+- **`image`** en items → Imagen única por elemento (legacy, compatible)
+- **`images`** en items → Múltiples imágenes por elemento (galería, storytelling visual)
+
+#### **Migración y Compatibilidad**
+
+- **Legacy**: `image` + `image_alt` (una sola imagen)
+- **Nuevo**: `images[]` + `images_alt[]` (múltiples imágenes alineadas por índice)
+- **Coexistencia**: Ambos formatos pueden coexistir, frontend decide prioridad
 
 Esta diferenciación ayuda al frontend a:
 - **Decidir layout automáticamente** sin depender del nombre de la sección
-- **Aplicar estilos específicos** (hero vs thumbnail)
-- **Optimizar carga** (banner prioritario, platos lazy-load)
+- **Aplicar estilos específicos** (hero vs thumbnail vs galería)
+- **Optimizar carga** (banner prioritario, platos lazy-load, galería progresiva)
 
 ### Ejemplos Prácticos
 
@@ -132,6 +141,39 @@ Esta diferenciación ayuda al frontend a:
 }
 ```
 
+#### **Menú con Múltiples Imágenes**
+```json
+{
+  "starters": [
+    {
+      "_id": "croquetas-jamon",
+      "name": "Croquetas de jamón",
+      "images": [
+        {
+          "url": "https://cdn.example.com/croquetas-1.webp",
+          "mime": "image/webp",
+          "width": 1200,
+          "height": 900,
+          "size": 180000
+        },
+        {
+          "url": "https://cdn.example.com/croquetas-2.webp",
+          "mime": "image/webp", 
+          "width": 1200,
+          "height": 900,
+          "size": 175000
+        }
+      ],
+      "images_alt": [
+        "Croquetas crujientes recién fritas",
+        "Detalle del interior cremoso de jamón"
+      ],
+      "allergens": ["gluten", "eggs", "milk"]
+    }
+  ]
+}
+```
+
 ### Beneficios de Esta Convención
 
 #### **🔧 Para el Frontend**
@@ -140,9 +182,10 @@ Esta diferenciación ayuda al frontend a:
 - **Tipado fuerte**: TypeScript puede inferir tipos automáticamente
 
 #### **🎨 Para el Diseño**
-- **Layout inteligente**: `banner_image` → hero, `image` → thumbnail
+- **Layout inteligente**: `banner_image` → hero, `image` → thumbnail, `images` → galería
 - **Responsive automático**: Diferentes tratamientos según el contexto
 - **Consistencia visual**: Mismos campos, misma apariencia
+- **Storytelling visual**: Múltiples perspectivas del mismo plato con `images[]`
 
 #### **🌍 Para Internacionalización**
 - **Traducción selectiva**: Solo campos `translatable: true`
