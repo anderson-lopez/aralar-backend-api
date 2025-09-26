@@ -1,14 +1,58 @@
+version: '3.8'
+
 services:
+  # API Flask con Gunicorn
   api:
-    build: .
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: aralar-api
     env_file: .env
-    depends_on: [mongo]
-    ports: ["8000:8000"]
-    volumes: [".:/app"]
+    environment:
+      - FLASK_ENV=production
+      - MONGO_URI=mongodb://mongo:27017/aralar
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    networks:
+      - aralar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/docs/openapi.json"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Base de datos MongoDB
   mongo:
-    image: mongo:7
-    ports: ["27017:27017"]
+    image: mongo:7-jammy
+    container_name: aralar-mongo
+    environment:
+      - MONGO_INITDB_DATABASE=aralar
+    ports:
+      - "27017:27017"
     volumes:
       - mongo_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - aralar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  aralar-network:
+    driver: bridge
+
 volumes:
   mongo_data:
+    driver: local

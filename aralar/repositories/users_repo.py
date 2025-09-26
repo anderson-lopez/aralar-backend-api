@@ -5,7 +5,6 @@ from .base_repo import to_object_id
 class UsersRepo:
     def __init__(self, db):
         self.col = db["users"]
-        self.col.create_index("email", unique=True)
 
     def insert(self, doc: dict):
         res = self.col.insert_one(doc)

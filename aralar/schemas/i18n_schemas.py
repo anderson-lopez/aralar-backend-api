@@ -1,0 +1,269 @@
+from marshmallow import Schema, fields, validate
+
+
+class TranslateItemSchema(Schema):
+    source = fields.String(
+        metadata={"description": "Texto original", "example": "Hola mundo"}
+    )
+    translated = fields.String(
+        metadata={"description": "Texto traducido", "example": "Hello world"}
+    )
+    cached = fields.Boolean(
+        metadata={"description": "Si la traducción vino del cache", "example": False}
+    )
+
+
+class TranslateRequestSchema(Schema):
+    texts = fields.List(
+        fields.String(),
+        required=True,
+        validate=validate.Length(min=1, max=100),
+        metadata={
+            "description": "Lista de textos a traducir",
+            "example": ["Hola mundo", "Pollo asado", "¿Cómo estás?"]
+        }
+    )
+    source_lang = fields.String(
+        required=False,
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar", "auto",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
+        metadata={
+            "description": "Idioma de origen (opcional, se detecta automáticamente). Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "eu"
+        }
+    )
+    target_lang = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
+        metadata={
+            "description": "Idioma de destino. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "es"
+        }
+    )
+    tenant_id = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=50),
+        metadata={
+            "description": "ID del tenant/organización",
+            "example": "restaurant-123"
+        }
+    )
+    use_glossary = fields.Boolean(
+        load_default=True,
+        metadata={
+            "description": "Usar glosario personalizado si existe",
+            "example": True
+        }
+    )
+
+
+class TranslateResponseSchema(Schema):
+    provider = fields.String(
+        metadata={"description": "Proveedor de traducción usado", "example": "deepl"}
+    )
+    source_lang = fields.String(
+        metadata={"description": "Idioma de origen detectado", "example": "es"}
+    )
+    target_lang = fields.String(
+        metadata={"description": "Idioma de destino", "example": "en"}
+    )
+    items = fields.List(
+        fields.Nested(TranslateItemSchema),
+        metadata={"description": "Lista de traducciones"}
+    )
+
+
+class DetectRequestSchema(Schema):
+    texts = fields.List(
+        fields.String(),
+        required=True,
+        validate=validate.Length(min=1, max=50),
+        metadata={
+            "description": "Lista de textos para detectar idioma",
+            "example": ["Hola mundo", "Hello world", "Bonjour le monde"]
+        }
+    )
+
+
+class DetectItemSchema(Schema):
+    text = fields.String(
+        metadata={"description": "Texto analizado", "example": "Hola mundo"}
+    )
+    lang = fields.String(
+        metadata={"description": "Idioma detectado", "example": "es"}
+    )
+
+
+class DetectResponseSchema(Schema):
+    items = fields.List(
+        fields.Nested(DetectItemSchema),
+        metadata={"description": "Lista de detecciones de idioma"}
+    )
+
+
+class GlossaryUpsertSchema(Schema):
+    tenant_id = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=50),
+        metadata={
+            "description": "ID del tenant/organización",
+            "example": "restaurant-123"
+        }
+    )
+    source_lang = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
+        metadata={
+            "description": "Idioma de origen del glosario. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "eu"
+        }
+    )
+    target_lang = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
+        metadata={
+            "description": "Idioma de destino del glosario. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "es"
+        }
+    )
+    pairs = fields.List(
+        fields.Dict(keys=fields.String(), values=fields.String()),
+        load_default=list,
+        validate=validate.Length(max=1000),
+        metadata={
+            "description": "Pares de traducción personalizadas",
+            "example": [{"pollo": "chicken"}, {"asado": "roasted"}, {"paella": "paella"}]
+        }
+    )
+
+
+class GlossaryQuerySchema(Schema):
+    tenant_id = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=50),
+        metadata={
+            "description": "ID del tenant/organización",
+            "example": "restaurant-123"
+        }
+    )
+    source_lang = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
+        metadata={
+            "description": "Idioma de origen del glosario. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "eu"
+        }
+    )
+    target_lang = fields.String(
+        required=True,
+        validate=validate.OneOf([
+            # Idiomas principales
+            "es", "en", "fr", "de", "it", "pt", "ru", "ja", "ko", "zh", "ar",
+            # Idiomas regionales españoles
+            "eu", "ca", "gl", 
+            # Idiomas europeos adicionales
+            "nl", "sv", "da", "no", "fi", "pl", "cs", "sk", "hu", "ro", "bg", "hr", "sl", "et", "lv", "lt",
+            # Idiomas asiáticos
+            "hi", "th", "vi", "id", "ms", "tl", "bn", "ta", "te", "ml", "kn", "gu", "mr", "ne", "si", "my", "km", "lo",
+            # Idiomas del Medio Oriente y África
+            "he", "fa", "ur", "tr", "az", "kk", "ky", "uz", "tg", "mn", "ka", "am", "ti", "sw", "zu", "xh", "af", "ig", "yo", "ha",
+            # Otros idiomas importantes
+            "uk", "be", "mk", "sq", "mt", "is", "ga", "cy", "br", "co", "eo", "la", "yi", "jv", "su", "ceb", "hmn", "ht", "mi", "sm", "mg", "ny", "sn", "st", "so", "rw", "lg"
+        ]),
+        metadata={
+            "description": "Idioma de destino del glosario. Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "example": "es"
+        }
+    )
+
+
+class GlossaryResponseSchema(Schema):
+    tenant_id = fields.String(
+        metadata={"description": "ID del tenant/organización", "example": "restaurant-123"}
+    )
+    source_lang = fields.String(
+        metadata={"description": "Idioma de origen", "example": "es"}
+    )
+    target_lang = fields.String(
+        metadata={"description": "Idioma de destino", "example": "en"}
+    )
+    version = fields.Integer(
+        metadata={"description": "Versión del glosario", "example": 3}
+    )
+    pairs = fields.List(
+        fields.Dict(keys=fields.String(), values=fields.String()),
+        metadata={
+            "description": "Pares de traducción personalizadas",
+            "example": [{"pollo": "chicken"}, {"asado": "roasted"}, {"paella": "paella"}]
+        }
+    )
+
+
+class I18nMessageSchema(Schema):
+    message = fields.String(
+        metadata={"description": "Mensaje de error o información", "example": "Validation error"}
+    )

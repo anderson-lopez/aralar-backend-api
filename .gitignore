@@ -92,3 +92,5 @@ Desktop.ini
 
 # Docker/Compose (si generas estos archivos locales)
 .docker/
+
+data/
