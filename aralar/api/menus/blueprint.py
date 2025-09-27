@@ -14,8 +14,13 @@ from ...schemas.menu_schemas import (
     MenuListQueryArgs,
     MenuMessageSchema,
     PublicAvailableQueryArgs,
+    PublicFeaturedQueryArgs,
     MenuPublicAvailableListSchema,
+    MenuFeaturedUpdateSchema,
+    MenuFeaturedListSchema,
     RenderQueryArgs,
+    RenderMultipleSchema,
+    RenderMultipleResponseSchema,
 )
 from ...core.security import require_permissions
 
@@ -194,6 +199,25 @@ def set_menu_availability(payload, menu_id):
     return {"message": "ok"}
 
 
+@blp.route("/<menu_id>/featured", methods=["PUT"])
+@require_permissions("menus:update")
+@blp.arguments(MenuFeaturedUpdateSchema)
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def set_menu_featured(payload, menu_id):
+    """Update featured status and order of a menu"""
+    svc = get_svc()
+    doc = svc.update_featured(
+        menu_id, 
+        payload["featured"], 
+        payload.get("featured_order")
+    )
+    if not doc:
+        abort(404, message="menu not found")
+    return {"message": "ok"}
+
+
 @blp.route("/public/available", methods=["GET"])
 @blp.arguments(PublicAvailableQueryArgs, location="query")
 @blp.response(200, MenuPublicAvailableListSchema)
@@ -237,6 +261,65 @@ def public_available(query):
     }
 
 
+@blp.route("/public/featured", methods=["GET"])
+@blp.arguments(PublicFeaturedQueryArgs, location="query")
+@blp.response(200, MenuFeaturedListSchema)
+@blp.alt_response(400, schema=MenuMessageSchema)
+def public_featured(query):
+    """List featured menus available now or on a given date, fully rendered for landing page."""
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+
+    locale = query.get("locale")
+    fallback = query.get("fallback")
+    tzname = query.get("tz") or "Europe/Madrid"
+    date_str = query.get("date")
+    include_ui = query.get("include_ui", False)
+
+    svc = get_svc()
+
+    if date_str:
+        try:
+            dt_local = datetime.fromisoformat(date_str)
+            if dt_local.tzinfo is None:
+                dt_local = dt_local.replace(tzinfo=ZoneInfo(tzname))
+            dt_utc = dt_local.astimezone(timezone.utc)
+        except Exception:
+            abort(400, message="invalid date")
+        items = svc.render_featured_menus(locale=locale, tzname=tzname, fallback=fallback, date_utc=dt_utc, include_ui=include_ui)
+    else:
+        items = svc.render_featured_menus(locale=locale, tzname=tzname, fallback=fallback, include_ui=include_ui)
+
+    return {"items": items}
+
+
+@blp.route("/render/multiple", methods=["POST"])
+@blp.arguments(RenderMultipleSchema)
+@blp.response(200, RenderMultipleResponseSchema)
+@blp.alt_response(400, schema=MenuMessageSchema, description="Invalid request")
+def render_multiple_menus(data):
+    """
+    Renderiza múltiples menus de una vez para optimizar requests del frontend.
+    
+    Útil cuando necesitas renderizar varios menus específicos (no necesariamente destacados).
+    Máximo 10 menus por request para evitar timeouts.
+    """
+    svc = get_svc()
+    
+    # Validar que todos los IDs sean válidos
+    for menu_id in data["menu_ids"]:
+        _abort_if_invalid_id(menu_id)
+    
+    result = svc.render_multiple(
+        menu_ids=data["menu_ids"],
+        locale=data["locale"],
+        fallback=data.get("fallback"),
+        include_ui=data.get("include_ui", False)
+    )
+    
+    return result
+
+
 @blp.route("/<menu_id>/render", methods=["GET"])
 @blp.arguments(RenderQueryArgs, location="query")
 @blp.alt_response(400, schema=MenuMessageSchema, description="Invalid id or params")
@@ -245,13 +328,14 @@ def render_menu(query, menu_id):
     Devuelve el JSON final fusionado para ser mostrado en el frontend público.
 
     Query:
-      - locale=es-ES   (requerido)
-      - fallback=en-GB (opcional) => si no hay traducción en 'locale', usa esta
+      - locale=es-ES     (requerido)
+      - fallback=en-GB   (opcional) => si no hay traducción en 'locale', usa esta
+      - include_ui=true  (opcional) => incluir manifest de UI del template
     """
     _abort_if_invalid_id(menu_id)
     locale = query.get("locale")
     fallback = query.get("fallback")
-    include_ui = request.args.get("with_ui") in ("1", "true", "yes")  # <<--- NUEVO
+    include_ui = query.get("include_ui", False)
     if not locale:
         abort(400, message="locale is required")
 
