@@ -63,6 +63,10 @@ ROLE_TEMPLATES: dict[str, dict] = {
         "description": "Personal, acceso mínimo",
         "permissions": ["menus:read", "reservas:read", "reservas:create"],
     },
+    "user": {
+        "description": "Usuario, acceso mínimo",
+        "permissions": ["menus:read", "reservas:read", "reservas:create"],
+    },
 }
 
 
