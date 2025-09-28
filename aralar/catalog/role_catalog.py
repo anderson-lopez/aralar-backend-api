@@ -7,10 +7,8 @@ DEFAULT_PERMISSIONS = [
     # usuarios
     "users:read",
     "users:create",
-    "users:update",
-    "users:delete",
     "users:assign_roles",
-    "users:assign_permissions",
+    "users:assign_permissions", 
     "users:activate",
     # roles
     "roles:read",
@@ -19,22 +17,22 @@ DEFAULT_PERMISSIONS = [
     "roles:delete",
     "roles:permissions:read",
     "roles:permissions:update",
-    # menus / reservas
+    # menus (incluye i18n y uploads)
     "menus:read",
     "menus:create",
-    "menus:update",
+    "menus:update",  # Usado también por i18n y uploads
     "menus:delete",
     "menus:publish",
-    "menus:validate",
     # menu templates
     "menu_templates:read",
     "menu_templates:create",
     "menu_templates:update",
-    "menu_templates:delete",
     "menu_templates:publish",
-    "menu_templates:validate",
     "menu_templates:archive",
-    # reservas
+    # auth admin
+    "auth:invalidate_tokens",
+    "auth:view_blacklist",
+    # reservas (futuro)
     "reservas:read",
     "reservas:create",
     "reservas:update",
