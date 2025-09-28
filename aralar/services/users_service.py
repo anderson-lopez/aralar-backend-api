@@ -56,7 +56,7 @@ class UsersService:
         return self.repo.insert(doc)
 
     def change_password(self, user_id: str, data: dict):
-        """Change user password"""
+        """Change user password and increment perm_version to invalidate existing tokens"""
         user = self.repo.find_by_id(user_id)
         if not user:
             abort(404, message="User not found", error="user_not_found")
@@ -65,7 +65,8 @@ class UsersService:
         if data["new_password"] != data["confirm_new_password"]:
             abort(400, message="New passwords do not match", error="validation_error")
         hashed = ph.hash(data["new_password"])
-        self.repo.update(user_id, {"password_hash": hashed})
+        # Usar el nuevo método que incrementa perm_version automáticamente
+        self.repo.change_password(user_id, hashed)
         return True
 
     def verify_credentials(self, email, password):

@@ -1,6 +1,6 @@
 from flask_smorest import Blueprint
 from flask import request
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -12,7 +12,7 @@ from ...repositories.users_repo import UsersRepo
 from ...repositories.roles_repo import RolesRepo
 from ...services.users_service import UsersService
 from ...services.auth_service import AuthService
-from ...core.security import jwt_claims_from_user
+from ...core.security import jwt_claims_from_user, jwt_required_with_version, require_permissions
 from ...schemas.auth_schemas import (
     LoginSchema,
     LoginResponseSchema,
@@ -22,6 +22,13 @@ from ...schemas.auth_schemas import (
     RegisterResponseSchema,
     ChangePasswordSchema,
     ChangePasswordResponseSchema,
+)
+from ...schemas.token_blacklist_schemas import (
+    LogoutSchema,
+    LogoutResponseSchema,
+    InvalidateTokenSchema,
+    InvalidateTokenResponseSchema,
+    BlacklistHistoryResponseSchema,
 )
 from flask import current_app
 from flask_smorest import abort
@@ -49,13 +56,20 @@ def login(login_data):
     resolved_roles = roles_repo.resolve_roles(user.get("roles", []))
     claims = jwt_claims_from_user(user, resolved_roles=resolved_roles)
 
+    # Generar JTI único para el token
+    import uuid
+    jti = str(uuid.uuid4())
+    
     return {
         "access_token": create_access_token(
             identity=str(user["_id"]),
-            additional_claims=claims,
+            additional_claims={**claims, "jti": jti},
             expires_delta=timedelta(minutes=180),
         ),
-        "refresh_token": create_refresh_token(identity=str(user["_id"]), additional_claims=claims),
+        "refresh_token": create_refresh_token(
+            identity=str(user["_id"]), 
+            additional_claims={**claims, "jti": f"{jti}_refresh"}
+        ),
     }
 
 
@@ -63,7 +77,7 @@ def login(login_data):
 @blp.response(200, UserInfoSchema)
 @blp.alt_response(401, schema=AuthErrorSchema)
 @blp.doc(security=[{"bearerAuth": []}])
-@jwt_required()
+@jwt_required_with_version()
 def me():
     """Get current user information from JWT token"""
     from flask_jwt_extended import get_jwt_identity, get_jwt
@@ -106,7 +120,7 @@ def register(register_data):
 @blp.alt_response(400, schema=AuthErrorSchema)
 @blp.alt_response(401, schema=AuthErrorSchema)
 @blp.doc(security=[{"bearerAuth": []}])
-@jwt_required()
+@jwt_required_with_version()
 def change_password(change_password_data):
     """Change user password"""
     from flask_jwt_extended import get_jwt_identity, get_jwt
@@ -124,3 +138,114 @@ def change_password(change_password_data):
         abort(400, message=str(e), error="validation_error")
     except Exception as e:
         abort(400, message="Password change failed", error="password_change_error")
+
+
+@blp.route("/logout", methods=["POST"])
+@blp.arguments(LogoutSchema)
+@blp.response(200, LogoutResponseSchema)
+@blp.alt_response(401, schema=AuthErrorSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+@jwt_required_with_version()
+def logout(logout_data):
+    """Logout user and invalidate current token"""
+    from flask_jwt_extended import get_jwt_identity
+    from ...repositories.token_blacklist_repo import TokenBlacklistRepo
+    from ...services.token_blacklist_service import TokenBlacklistService
+    
+    user_id = get_jwt_identity()
+    
+    # Obtener token del header Authorization
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        abort(401, message="No token provided", error="missing_token")
+    
+    token = auth_header.split(' ')[1]
+    
+    try:
+        # Invalidar token
+        blacklist_repo = TokenBlacklistRepo(current_app.mongo_db)
+        blacklist_service = TokenBlacklistService(blacklist_repo)
+        
+        result = blacklist_service.logout_token(token, user_id)
+        
+        return {
+            "message": "Logout successful",
+            "blacklisted_at": result["blacklisted_at"]
+        }
+        
+    except ValueError as e:
+        abort(400, message=str(e), error="logout_failed")
+    except Exception as e:
+        abort(400, message="Logout failed", error="logout_error")
+
+
+@blp.route("/invalidate-token", methods=["POST"])
+@blp.arguments(InvalidateTokenSchema)
+@blp.response(200, InvalidateTokenResponseSchema)
+@blp.alt_response(400, schema=AuthErrorSchema)
+@blp.alt_response(403, schema=AuthErrorSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+@require_permissions("auth:invalidate_tokens")
+def invalidate_token(invalidate_data):
+    """Invalidate a specific token (admin only)"""
+    from flask_jwt_extended import get_jwt_identity
+    from ...repositories.token_blacklist_repo import TokenBlacklistRepo
+    from ...services.token_blacklist_service import TokenBlacklistService
+    
+    admin_user_id = get_jwt_identity()
+    token_to_invalidate = invalidate_data["token"]
+    reason = invalidate_data.get("reason", "admin_action")
+    
+    try:
+        blacklist_repo = TokenBlacklistRepo(current_app.mongo_db)
+        blacklist_service = TokenBlacklistService(blacklist_repo)
+        
+        # Invalidar token por admin
+        blacklist_service.invalidate_token_by_admin(
+            token_to_invalidate, 
+            admin_user_id, 
+            reason
+        )
+        
+        # Decodificar para obtener JTI para respuesta
+        from flask_jwt_extended import decode_token
+        decoded = decode_token(token_to_invalidate)
+        jti = decoded.get("jti")
+        
+        return {
+            "message": "Token invalidated successfully",
+            "jti": jti,
+            "reason": f"{reason}_by_{admin_user_id}",
+            "blacklisted_at": datetime.now(timezone.utc).isoformat()
+        }
+        
+    except ValueError as e:
+        abort(400, message=str(e), error="invalidation_failed")
+    except Exception as e:
+        abort(400, message="Token invalidation failed", error="invalidation_error")
+
+
+@blp.route("/blacklist-history/<user_id>", methods=["GET"])
+@blp.response(200, BlacklistHistoryResponseSchema)
+@blp.alt_response(403, schema=AuthErrorSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+@require_permissions("auth:view_blacklist")
+def get_blacklist_history(user_id):
+    """Get blacklist history for a user (admin only)"""
+    from ...repositories.token_blacklist_repo import TokenBlacklistRepo
+    from ...services.token_blacklist_service import TokenBlacklistService
+    
+    try:
+        blacklist_repo = TokenBlacklistRepo(current_app.mongo_db)
+        blacklist_service = TokenBlacklistService(blacklist_repo)
+        
+        history = blacklist_service.get_user_blacklist_history(user_id)
+        
+        return {
+            "user_id": user_id,
+            "tokens": history,
+            "total_count": len(history)
+        }
+        
+    except Exception as e:
+        abort(400, message="Failed to get blacklist history", error="history_error")
