@@ -51,3 +51,28 @@ class MenusRepo:
             },
         }
         return list(self.col.find(q).sort("updated_at", -1))
+
+    def list_featured_by_day(self, *, locale: str, date_iso: str, weekday: str):
+        """Devuelve menús destacados publicados para un locale en un día concreto.
+
+        date_iso: 'YYYY-MM-DD' (string)
+        weekday: uno de 'MON'..'SUN'
+        """
+        locale_status_field = f"publish.{locale}.status"
+        q = {
+            "status": "published",
+            locale_status_field: "published",
+            "featured": True,  # Solo menus destacados
+            "availability.days_of_week": weekday,
+            "availability.date_ranges": {
+                "$elemMatch": {
+                    "start": {"$lte": date_iso},
+                    "end": {"$gte": date_iso},
+                }
+            },
+        }
+        # Ordenar por featured_order (nulls last) y luego por updated_at
+        return list(self.col.find(q).sort([
+            ("featured_order", 1),  # Ascending order (lower numbers first)
+            ("updated_at", -1)      # Most recent first for same order
+        ]))

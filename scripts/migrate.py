@@ -1,9 +1,10 @@
 import importlib.util
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pymongo import MongoClient
 from dotenv import load_dotenv
+
 # Ensure project root (one level up) is on sys.path when running from scripts/
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 if BASE_DIR not in sys.path:
@@ -42,7 +43,7 @@ def main():
         db["schema_migrations"].insert_one(
             {
                 "name": name,
-                "applied_at": datetime.utcnow(),
+                "applied_at": datetime.now(timezone.utc),
             }
         )
         print(f"[migrate] done {name}")
