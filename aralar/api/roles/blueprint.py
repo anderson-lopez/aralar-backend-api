@@ -102,7 +102,22 @@ def list_permissions():
 @blp.arguments(PermissionUpsertSchema)
 @blp.response(200, PermissionSchema)
 @blp.doc(security=[{"bearerAuth": []}])
-def upsert_permission(name, body):
+def upsert_permission(body, name):
     svc = get_svc()
     doc = svc.upsert_permission(name, body)
+    return doc
+
+
+@blp.route("/permissions/id/<permission_id>", methods=["PUT"])
+@require_permissions("roles:permissions:update")
+@blp.arguments(PermissionUpsertSchema)
+@blp.response(200, PermissionSchema)
+@blp.alt_response(404, schema=RoleMessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def update_permission_by_id(body, permission_id):
+    """Update permission description by ID (safer for names with special characters)"""
+    svc = get_svc()
+    doc = svc.update_permission_by_id(permission_id, body)
+    if not doc:
+        abort(404, message="Permission not found")
     return doc

@@ -19,6 +19,7 @@ class RoleListSchema(Schema):
 
 
 class PermissionSchema(Schema):
+    id = fields.String(attribute="_id")
     name = fields.String(required=True)
     description = fields.String(load_default="", dump_default="")
 
