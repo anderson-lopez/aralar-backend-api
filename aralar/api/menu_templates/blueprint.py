@@ -21,6 +21,7 @@ blp = Blueprint(
     description="Menu Templates",
 )
 
+
 def get_svc():
     db = current_app.mongo_db
     return MenuTemplatesService(MenuTemplatesRepo(db))
@@ -30,13 +31,23 @@ def get_svc():
 @require_permissions("menu_templates:create")
 @blp.arguments(MenuTemplateCreateSchema)
 @blp.response(201, IdSchema)
+@blp.alt_response(
+    409,
+    schema=MenuTemplateMessageSchema,
+    description="Template with same slug and version already exists",
+)
 @blp.alt_response(422, schema=MenuTemplateMessageSchema, description="Validation error")
 @blp.doc(security=[{"bearerAuth": []}])
 def create_template(data):
     """Create a new menu template (draft by default)"""
     svc = get_svc()
-    _id = svc.create(data)
-    return {"id": _id}
+    result = svc.create(data)
+
+    # Manejar caso de conflicto
+    if isinstance(result, dict) and "conflict" in result:
+        abort(409, description=result["conflict"])
+
+    return {"id": result}
 
 
 @blp.route("", methods=["GET"])

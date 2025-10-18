@@ -7,7 +7,20 @@ class MenuTemplatesService:
 
     def create(self, data: dict):
         data.setdefault("status", "draft")
-        return self.repo.insert(data)
+        
+        # Validar que no exista un template con el mismo slug+version
+        slug = data.get("slug")
+        version = data.get("version", 1)
+        
+        if slug and version:
+            existing = self.repo.get_by_slug_version(slug, version)
+            if existing:
+                return {"conflict": f"Template with slug '{slug}' and version {version} already exists"}
+        
+        try:
+            return self.repo.insert(data)
+        except ValueError as e:
+            return {"conflict": str(e)}
 
     def list(self, status=None, slug=None, tenant_id=None):
         f = {}
@@ -32,20 +45,43 @@ class MenuTemplatesService:
         # Evita intentar modificar _id y otros campos no actualizables a nivel de servicio
         if "_id" in patch:
             patch.pop("_id", None)
-        return self.repo.update(template_id, patch)
+        self.repo.update(template_id, patch)
+        return template_id
 
     def publish(self, template_id: str, notes: str | None = None):
         t = self.repo.get(template_id)
         if not t:
             return None
-        # clone with version+1 if already published, else publish v=existing or v=1?
+        
         current_ver = t.get("version", 1)
-        # Strategy: create NEW document with version = max(slug)+1
-        same_slug = self.repo.list({"slug": t["slug"]}, limit=1000, skip=0)
-        max_ver = max([x.get("version", 1) for x in same_slug]) if same_slug else current_ver
-        new_doc = deepcopy(t)
-        new_doc.pop("_id", None)
-        new_doc["version"] = max_ver + 1 if t.get("status") == "published" else current_ver
-        new_doc["status"] = "published"
-        new_doc["publish_notes"] = notes or ""
-        return self.repo.insert(new_doc)
+        
+        # Si ya está publicado, crear nueva versión
+        if t.get("status") == "published":
+            # Buscar la versión más alta para este slug
+            same_slug = self.repo.list({"slug": t["slug"]}, limit=1000, skip=0)
+            max_ver = max([x.get("version", 1) for x in same_slug]) if same_slug else current_ver
+            
+            new_doc = deepcopy(t)
+            new_doc.pop("_id", None)
+            new_doc["version"] = max_ver + 1
+            new_doc["status"] = "published"
+            new_doc["publish_notes"] = notes or ""
+            
+            # Validar que la nueva versión no exista
+            existing = self.repo.get_by_slug_version(t["slug"], max_ver + 1)
+            if existing:
+                return {"conflict": f"Version {max_ver + 1} already exists for slug '{t['slug']}'"}
+            
+            return self.repo.insert(new_doc)
+        else:
+            # Publicar versión actual (draft -> published)
+            # Verificar que no exista ya una versión publicada con mismo slug+version
+            existing = self.repo.get_by_slug_version(t["slug"], current_ver)
+            if existing and existing.get("_id") != t.get("_id"):
+                return {"conflict": f"Another template with slug '{t['slug']}' and version {current_ver} already exists"}
+            
+            self.repo.update(template_id, {
+                "status": "published",
+                "publish_notes": notes or ""
+            })
+            return template_id

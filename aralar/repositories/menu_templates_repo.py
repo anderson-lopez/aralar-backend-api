@@ -1,5 +1,6 @@
 from .base_repo import to_object_id
 from datetime import datetime
+from pymongo.errors import DuplicateKeyError
 
 
 class MenuTemplatesRepo:
@@ -9,8 +10,15 @@ class MenuTemplatesRepo:
     def insert(self, doc: dict):
         doc["created_at"] = doc.get("created_at") or datetime.utcnow()
         doc["updated_at"] = datetime.utcnow()
-        res = self.col.insert_one(doc)
-        return str(res.inserted_id)
+        
+        try:
+            res = self.col.insert_one(doc)
+            return str(res.inserted_id)
+        except DuplicateKeyError as e:
+            # Extraer información del error para mensaje más claro
+            slug = doc.get("slug", "unknown")
+            version = doc.get("version", "unknown")
+            raise ValueError(f"Template with slug '{slug}' and version '{version}' already exists") from e
 
     def get(self, _id: str):
         return self.col.find_one({"_id": to_object_id(_id)})

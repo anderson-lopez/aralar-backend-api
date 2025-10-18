@@ -1,4 +1,4 @@
-from marshmallow import Schema, fields as ma_fields, validate, ValidationError
+from marshmallow import Schema, fields as ma_fields, validate, ValidationError, validates_schema
 
 DOW = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
 
@@ -92,8 +92,8 @@ class TemplateUISchema(Schema):
 
 class MenuTemplateCreateSchema(Schema):
     name = ma_fields.String(required=True)
-    slug = ma_fields.String(required=True)
-    version = ma_fields.Integer(load_default=1)
+    slug = ma_fields.String(required=True, validate=validate.Regexp(r'^[a-z0-9-_]+$', error="Slug must contain only lowercase letters, numbers, hyphens, and underscores"))
+    version = ma_fields.Integer(load_default=1, validate=validate.Range(min=1, error="Version must be a positive integer"))
     status = ma_fields.String(
         load_default="draft", validate=validate.OneOf(["draft", "published", "archived"])
     )
@@ -101,6 +101,12 @@ class MenuTemplateCreateSchema(Schema):
     i18n = ma_fields.Dict(required=False)
     sections = ma_fields.List(ma_fields.Nested(SectionSchema), required=True)
     ui = ma_fields.Nested(TemplateUISchema, required=False)  # <<--- NUEVO
+    
+    @validates_schema
+    def validate_slug_format(self, data, **kwargs):
+        slug = data.get('slug')
+        if slug and len(slug) > 100:
+            raise ValidationError('Slug must be 100 characters or less', 'slug')
 
 
 class MenuTemplateUpdateSchema(MenuTemplateCreateSchema):
