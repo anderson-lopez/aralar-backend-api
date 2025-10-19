@@ -1,4 +1,5 @@
-from marshmallow import Schema, fields, validate
+from marshmallow import Schema, fields, validate, validates, ValidationError
+from flask import current_app
 
 
 class TranslateItemSchema(Schema):
@@ -23,227 +24,16 @@ class TranslateRequestSchema(Schema):
     )
     source_lang = fields.String(
         required=False,
-        validate=validate.OneOf(
-            [
-                # Idiomas principales
-                "es",
-                "en",
-                "fr",
-                "de",
-                "it",
-                "pt",
-                "ru",
-                "ja",
-                "ko",
-                "zh",
-                "ar",
-                "auto",
-                # Idiomas regionales españoles
-                "eu",
-                "ca",
-                "gl",
-                # Idiomas europeos adicionales
-                "nl",
-                "sv",
-                "da",
-                "no",
-                "fi",
-                "pl",
-                "cs",
-                "sk",
-                "hu",
-                "ro",
-                "bg",
-                "hr",
-                "sl",
-                "et",
-                "lv",
-                "lt",
-                # Idiomas asiáticos
-                "hi",
-                "th",
-                "vi",
-                "id",
-                "ms",
-                "tl",
-                "bn",
-                "ta",
-                "te",
-                "ml",
-                "kn",
-                "gu",
-                "mr",
-                "ne",
-                "si",
-                "my",
-                "km",
-                "lo",
-                # Idiomas del Medio Oriente y África
-                "he",
-                "fa",
-                "ur",
-                "tr",
-                "az",
-                "kk",
-                "ky",
-                "uz",
-                "tg",
-                "mn",
-                "ka",
-                "am",
-                "ti",
-                "sw",
-                "zu",
-                "xh",
-                "af",
-                "ig",
-                "yo",
-                "ha",
-                # Otros idiomas importantes
-                "uk",
-                "be",
-                "mk",
-                "sq",
-                "mt",
-                "is",
-                "ga",
-                "cy",
-                "br",
-                "co",
-                "eo",
-                "la",
-                "yi",
-                "jv",
-                "su",
-                "ceb",
-                "hmn",
-                "ht",
-                "mi",
-                "sm",
-                "mg",
-                "ny",
-                "sn",
-                "st",
-                "so",
-                "rw",
-                "lg",
-            ]
-        ),
         metadata={
-            "description": "Idioma de origen (opcional, se detecta automáticamente). Incluye euskera (eu), catalán (ca), gallego (gl)",
+            "description": "Idioma de origen (opcional). Para DeepL no se admite 'auto' (omitir para autodetección)",
             "example": "es",
         },
     )
     target_lang = fields.String(
         required=True,
-        validate=validate.OneOf(
-            [
-                # Idiomas principales
-                "es",
-                "en",
-                "fr",
-                "de",
-                "it",
-                "pt",
-                "ru",
-                "ja",
-                "ko",
-                "zh",
-                "ar",
-                # Idiomas regionales españoles
-                "eu",
-                "ca",
-                "gl",
-                # Idiomas europeos adicionales
-                "nl",
-                "sv",
-                "da",
-                "no",
-                "fi",
-                "pl",
-                "cs",
-                "sk",
-                "hu",
-                "ro",
-                "bg",
-                "hr",
-                "sl",
-                "et",
-                "lv",
-                "lt",
-                # Idiomas asiáticos
-                "hi",
-                "th",
-                "vi",
-                "id",
-                "ms",
-                "tl",
-                "bn",
-                "ta",
-                "te",
-                "ml",
-                "kn",
-                "gu",
-                "mr",
-                "ne",
-                "si",
-                "my",
-                "km",
-                "lo",
-                # Idiomas del Medio Oriente y África
-                "he",
-                "fa",
-                "ur",
-                "tr",
-                "az",
-                "kk",
-                "ky",
-                "uz",
-                "tg",
-                "mn",
-                "ka",
-                "am",
-                "ti",
-                "sw",
-                "zu",
-                "xh",
-                "af",
-                "ig",
-                "yo",
-                "ha",
-                # Otros idiomas importantes
-                "uk",
-                "be",
-                "mk",
-                "sq",
-                "mt",
-                "is",
-                "ga",
-                "cy",
-                "br",
-                "co",
-                "eo",
-                "la",
-                "yi",
-                "jv",
-                "su",
-                "ceb",
-                "hmn",
-                "ht",
-                "mi",
-                "sm",
-                "mg",
-                "ny",
-                "sn",
-                "st",
-                "so",
-                "rw",
-                "lg",
-            ]
-        ),
         metadata={
-            "description": "Idioma de destino. Incluye euskera (eu), catalán (ca), gallego (gl)",
-            "example": "eu",
+            "description": "Idioma de destino. Depende del proveedor configurado (DeepL/Google)",
+            "example": "en",
         },
     )
     tenant_id = fields.String(
@@ -255,6 +45,69 @@ class TranslateRequestSchema(Schema):
         load_default=True,
         metadata={"description": "Usar glosario personalizado si existe", "example": True},
     )
+
+    # ---- Dynamic provider-based validation (per-request) ----
+    _DEEPL_SOURCE_LANGS = {
+        # DeepL source languages (no 'auto')
+        "bg","cs","da","de","el","en","es","et","fi","fr","hu","id","it",
+        "ja","ko","lt","lv","nb","nl","pl","pt","ro","ru","sk","sl","sv",
+        "tr","uk","zh"
+    }
+    _DEEPL_TARGET_LANGS = {
+        # DeepL target languages (include regional variants)
+        "bg","cs","da","de","el","en","en-gb","en-us","es","et","fi","fr","hu","id","it",
+        "ja","ko","lt","lv","nb","nl","pl","pt","pt-br","pt-pt","ro","ru","sk","sl","sv",
+        "tr","uk","zh"
+    }
+    _GOOGLE_LANGS = {
+        "es","en","fr","de","it","pt","ru","ja","ko","zh","ar",
+        "eu","ca","gl","nl","sv","da","no","fi","pl","cs","sk","hu","ro",
+        "bg","hr","sl","et","lv","lt","hi","th","vi","id","ms","tl","bn",
+        "ta","te","ml","kn","gu","mr","ne","si","my","km","lo","he","fa",
+        "ur","tr","az","kk","ky","uz","tg","mn","ka","am","ti","sw","zu",
+        "xh","af","ig","yo","ha","uk","be","mk","sq","mt","is","ga","cy",
+        "br","co","eo","la","yi","jv","su","ceb","hmn","ht","mi","sm","mg",
+        "ny","sn","st","so","rw","lg"
+    }
+
+    @staticmethod
+    def _provider_name() -> str:
+        try:
+            return (current_app.config.get("I18N_PROVIDER") or "deepl").lower()
+        except Exception:
+            return "deepl"
+
+    @classmethod
+    def _allowed_source_langs(cls):
+        p = cls._provider_name()
+        if p == "google":
+            return set(cls._GOOGLE_LANGS) | {"auto"}
+        return set(cls._DEEPL_SOURCE_LANGS)  # DeepL: no 'auto'
+
+    @classmethod
+    def _allowed_target_langs(cls):
+        p = cls._provider_name()
+        if p == "google":
+            return set(cls._GOOGLE_LANGS)
+        return set(cls._DEEPL_TARGET_LANGS)
+
+    @validates("source_lang")
+    def _validate_source_lang(self, value, **kwargs):
+        if value is None or str(value).strip() == "":
+            return
+        v = str(value).lower()
+        allowed = self._allowed_source_langs()
+        if v not in allowed:
+            raise ValidationError(f"source_lang '{value}' no soportado para proveedor '{self._provider_name()}'. Permitidos: {sorted(allowed)}")
+        if self._provider_name() == "deepl" and v == "auto":
+            raise ValidationError("Para DeepL no se admite 'auto'. Omite source_lang para autodetección.")
+
+    @validates("target_lang")
+    def _validate_target_lang(self, value, **kwargs):
+        v = str(value).lower()
+        allowed = self._allowed_target_langs()
+        if v not in allowed:
+            raise ValidationError(f"target_lang '{value}' no soportado para proveedor '{self._provider_name()}'. Permitidos: {sorted(allowed)}")
 
 
 class TranslateResponseSchema(Schema):
