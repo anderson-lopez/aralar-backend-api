@@ -29,6 +29,11 @@ DEFAULT_PERMISSIONS = [
     "menu_templates:update",
     "menu_templates:publish",
     "menu_templates:archive",
+    # notifications
+    "notifications:read",
+    "notifications:create", 
+    "notifications:update",
+    "notifications:delete",
     # auth admin
     "auth:invalidate_tokens",
     "auth:view_blacklist",
@@ -52,6 +57,10 @@ ROLE_TEMPLATES: dict[str, dict] = {
             "menus:read",
             "menus:create",
             "menus:update",
+            "notifications:read",
+            "notifications:create",
+            "notifications:update",
+            "notifications:delete",
             "reservas:read",
             "reservas:create",
             "reservas:update",
@@ -59,11 +68,11 @@ ROLE_TEMPLATES: dict[str, dict] = {
     },
     "staff": {
         "description": "Personal, acceso mínimo",
-        "permissions": ["menus:read", "reservas:read", "reservas:create"],
+        "permissions": ["menus:read", "notifications:read", "reservas:read", "reservas:create"],
     },
     "user": {
         "description": "Usuario, acceso mínimo",
-        "permissions": ["menus:read", "reservas:read", "reservas:create"],
+        "permissions": ["menus:read", "notifications:read", "reservas:read", "reservas:create"],
     },
 }
 
