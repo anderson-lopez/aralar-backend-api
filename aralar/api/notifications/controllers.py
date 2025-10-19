@@ -2,7 +2,7 @@ from flask import request, current_app
 from flask_smorest import Blueprint, abort
 from marshmallow import ValidationError
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 from aralar.services.notifications_service import NotificationsService
 from aralar.repositories.notifications_repo import NotificationsRepository
@@ -155,16 +155,33 @@ def get_active_notifications() -> List[Dict[str, Any]]:
         # Initialize service
         notifications_repo = NotificationsRepository(current_app.mongo_db)
         notifications_service = NotificationsService(notifications_repo)
+        # Optional timezone override, defaults to Config.TENANT_TIMEZONE in service/repo
+        tz = request.args.get('tz')
+        locale = request.args.get('locale')
         
-        notifications = notifications_service.get_active_notifications()
+        notifications = notifications_service.get_active_notifications(tzname=tz)
         
         # Convert ObjectIds to strings and format for public consumption
         formatted_notifications = []
         for notification in notifications:
             try:
+                # Pick content by requested locale with fallbacks
+                chosen_content: Optional[str] = None
+                locales = notification.get("locales", {}) or {}
+                i18n = notification.get("i18n") or {}
+                default_locale = i18n.get("default_locale")
+                if locale and locale in locales:
+                    chosen_content = (locales.get(locale) or {}).get("data", {}).get("content")
+                if not chosen_content and default_locale and default_locale in locales:
+                    chosen_content = (locales.get(default_locale) or {}).get("data", {}).get("content")
+                if not chosen_content and locales:
+                    # fallback to first available locale
+                    first_locale = next(iter(locales.values()))
+                    if isinstance(first_locale, dict):
+                        chosen_content = (first_locale.get("data") or {}).get("content")
                 formatted_notification = {
                     "id": str(notification["_id"]),
-                    "content": notification.get("content", ""),
+                    "content": chosen_content or "",
                     "priority": notification.get("priority", 1),
                     "display": notification.get("display", {})
                 }
@@ -176,6 +193,19 @@ def get_active_notifications() -> List[Dict[str, Any]]:
         return formatted_notifications
     except Exception as e:
         abort(500, description=f"Error retrieving active notifications: {str(e)}")
+
+
+def update_notification_locale(notification_id: str, locale: str, data: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Update or create locale-specific content for a notification"""
+    try:
+        notifications_repo = NotificationsRepository(current_app.mongo_db)
+        notifications_service = NotificationsService(notifications_repo)
+        success = notifications_service.update_locale(notification_id, locale, data, meta)
+        if not success:
+            abort(500, description="Failed to update notification locale")
+        return {"message": "Notification locale updated successfully"}
+    except Exception as e:
+        abort(500, description=f"Error updating notification locale: {str(e)}")
 
 
 def toggle_notification_status(notification_id: str) -> Dict[str, Any]:
@@ -237,8 +267,9 @@ def get_expired_notifications() -> Dict[str, Any]:
         # Initialize service
         notifications_repo = NotificationsRepository(current_app.mongo_db)
         notifications_service = NotificationsService(notifications_repo)
+        tz = request.args.get('tz')
         
-        notifications = notifications_service.get_expired_notifications()
+        notifications = notifications_service.get_expired_notifications(tzname=tz)
         
         # Convert ObjectIds to strings
         for notification in notifications:
@@ -260,8 +291,9 @@ def get_upcoming_notifications() -> Dict[str, Any]:
         # Initialize service
         notifications_repo = NotificationsRepository(current_app.mongo_db)
         notifications_service = NotificationsService(notifications_repo)
+        tz = request.args.get('tz')
         
-        notifications = notifications_service.get_upcoming_notifications()
+        notifications = notifications_service.get_upcoming_notifications(tzname=tz)
         
         # Convert ObjectIds to strings
         for notification in notifications:

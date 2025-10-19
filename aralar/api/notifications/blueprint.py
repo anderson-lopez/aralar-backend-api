@@ -14,6 +14,7 @@ from .controllers import (
     get_notification_stats,
     get_expired_notifications,
     get_upcoming_notifications,
+    update_notification_locale,
 )
 from aralar.schemas.notification_schemas import (
     NotificationCreateSchema,
@@ -21,6 +22,7 @@ from aralar.schemas.notification_schemas import (
     NotificationOutSchema,
     NotificationListResponseSchema,
     NotificationCreateResponseSchema,
+    NotificationLocaleUpdateSchema,
 )
 
 # Create blueprint
@@ -125,6 +127,22 @@ def get_all_notifications_route():
 @blp.doc(
     summary="Get active notifications",
     description="Get currently active notifications (public endpoint)",
+    parameters=[
+        {
+            "name": "tz",
+            "in": "query",
+            "description": "Optional timezone (IANA) to evaluate schedules; defaults to tenant timezone.",
+            "required": False,
+            "schema": {"type": "string", "example": "Europe/Madrid"},
+        },
+        {
+            "name": "locale",
+            "in": "query",
+            "description": "Preferred locale for content selection (e.g., es-ES)",
+            "required": False,
+            "schema": {"type": "string", "example": "es-ES"},
+        },
+    ],
 )
 def get_active_notifications_route():
     """Get currently active notifications (public endpoint)"""
@@ -174,6 +192,15 @@ def get_notification_stats_route():
 @blp.doc(
     summary="Get expired notifications",
     description="Get notifications that have expired",
+    parameters=[
+        {
+            "name": "tz",
+            "in": "query",
+            "description": "Optional timezone (IANA) to evaluate schedules; defaults to tenant timezone.",
+            "required": False,
+            "schema": {"type": "string", "example": "Europe/Madrid"},
+        }
+    ],
     security=[{"bearerAuth": []}],
 )
 def get_expired_notifications_route():
@@ -187,8 +214,31 @@ def get_expired_notifications_route():
 @blp.doc(
     summary="Get upcoming notifications",
     description="Get notifications that will start in the future",
+    parameters=[
+        {
+            "name": "tz",
+            "in": "query",
+            "description": "Optional timezone (IANA) to evaluate schedules; defaults to tenant timezone.",
+            "required": False,
+            "schema": {"type": "string", "example": "Europe/Madrid"},
+        }
+    ],
     security=[{"bearerAuth": []}],
 )
 def get_upcoming_notifications_route():
     """Get upcoming notifications"""
     return get_upcoming_notifications()
+
+
+# Update or create locale-specific content
+@blp.route("/<string:notification_id>/locales/<string:locale>", methods=["PUT"])
+@require_permissions("notifications:update")
+@blp.arguments(NotificationLocaleUpdateSchema)
+@blp.doc(
+    summary="Update notification locale",
+    description="Create or update locale-specific content for a notification",
+    security=[{"bearerAuth": []}],
+)
+def update_notification_locale_route(body, notification_id, locale):
+    """Update notification locale"""
+    return update_notification_locale(notification_id, locale, body["data"], body.get("meta"))

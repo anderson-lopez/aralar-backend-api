@@ -1,6 +1,8 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from werkzeug.exceptions import abort
+from zoneinfo import ZoneInfo
+from aralar.config import BaseConfig as Config
 
 
 class NotificationsService:
@@ -9,13 +11,39 @@ class NotificationsService:
     def __init__(self, repo):
         self.repo = repo
     
-    def create_notification(self, data: Dict[str, Any]) -> str:
+    def create_notification(self, data: Dict[str, Any], tzname: Optional[str] = None) -> str:
         """Create a new notification with validation"""
         # Validate that name is unique
         existing = self.repo.find_by_name(data["name"])
         if existing:
             abort(400, description="Notification name already exists")
         
+        # Ensure i18n presence and default locale content
+        i18n = data.get("i18n") or {}
+        default_locale = i18n.get("default_locale")
+        if not default_locale:
+            abort(400, description="i18n.default_locale is required")
+        # guarantee i18n.locales includes default
+        locales_list = set((i18n.get("locales") or []))
+        if default_locale not in locales_list:
+            locales_list.add(default_locale)
+            i18n["locales"] = list(locales_list)
+            data["i18n"] = i18n
+        # Ensure locales mapping has default locale content
+        locales_map = data.get("locales") or {}
+        default_has_content = bool((locales_map.get(default_locale) or {}).get("data", {}).get("content"))
+        if not default_has_content:
+            abort(400, description="locales[default_locale].data.content is required")
+
+        tz = tzname or Config.TENANT_TIMEZONE
+        sched = data.get("scheduling", {})
+        for k in ("start_date", "end_date"):
+            if k in sched and sched[k]:
+                dt = sched[k]
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=ZoneInfo(tz))
+                sched[k] = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
         # Add timestamps
         now = datetime.utcnow()
         notification_data = {
@@ -33,7 +61,7 @@ class NotificationsService:
             abort(404, description="Notification not found")
         return notification
     
-    def update_notification(self, notification_id: str, data: Dict[str, Any]) -> bool:
+    def update_notification(self, notification_id: str, data: Dict[str, Any], tzname: Optional[str] = None) -> bool:
         """Update notification with validation"""
         # Check if notification exists
         existing = self.repo.find_by_id(notification_id)
@@ -46,6 +74,15 @@ class NotificationsService:
             if name_exists:
                 abort(400, description="Notification name already exists")
         
+        tz = tzname or Config.TENANT_TIMEZONE
+        sched = data.get("scheduling", {})
+        for k in ("start_date", "end_date"):
+            if k in sched and sched[k]:
+                dt = sched[k]
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=ZoneInfo(tz))
+                sched[k] = dt.astimezone(timezone.utc).replace(tzinfo=None)
+
         # Add update timestamp
         data["updated_at"] = datetime.utcnow()
         
@@ -58,9 +95,9 @@ class NotificationsService:
         
         return self.repo.delete_one(notification_id)
     
-    def get_active_notifications(self, current_time: datetime = None) -> List[Dict[str, Any]]:
+    def get_active_notifications(self, current_time: datetime = None, tzname: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get notifications that should be active now"""
-        return self.repo.find_active_notifications(current_time)
+        return self.repo.find_active_notifications(current_time, tzname)
     
     def get_all_notifications(self, 
                             location: str = None, 
@@ -95,17 +132,27 @@ class NotificationsService:
         new_status = not notification.get("is_active", False)
         return self.repo.update_activation_status(notification_id, new_status)
     
+    def update_locale(self, notification_id: str, locale: str, data: Dict[str, Any], meta: Optional[Dict[str, Any]] = None) -> bool:
+        """Create or update locale-specific content for a notification"""
+        notification = self.repo.find_by_id(notification_id)
+        if not notification:
+            abort(404, description="Notification not found")
+        locales = notification.get("locales", {}) or {}
+        locales[locale] = {"data": data, "meta": meta}
+        update_doc = {"locales": locales, "updated_at": datetime.utcnow()}
+        return self.repo.update_one(notification_id, update_doc)
+    
     def get_notifications_by_location(self, location: str) -> List[Dict[str, Any]]:
         """Get notifications by display location"""
         return self.repo.find_by_location(location)
     
-    def get_expired_notifications(self) -> List[Dict[str, Any]]:
+    def get_expired_notifications(self, tzname: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get notifications that have expired"""
-        return self.repo.find_expired_notifications()
+        return self.repo.find_expired_notifications(None, tzname)
     
-    def get_upcoming_notifications(self) -> List[Dict[str, Any]]:
+    def get_upcoming_notifications(self, tzname: Optional[str] = None) -> List[Dict[str, Any]]:
         """Get notifications that will start in the future"""
-        return self.repo.find_upcoming_notifications()
+        return self.repo.find_upcoming_notifications(None, tzname)
     
     def validate_notification_data(self, data: Dict[str, Any]) -> None:
         """Validate notification data for business rules"""
@@ -134,6 +181,19 @@ class NotificationsService:
                         abort(400, description="Time end must be after time start when scheduling is on the same day")
                 except ValueError:
                     abort(400, description="Invalid time format")
+        
+        # Validate i18n only when present (create path requires it via schema)
+        i18n = data.get("i18n")
+        if i18n is not None:
+            default_locale = i18n.get("default_locale")
+            if not default_locale:
+                abort(400, description="i18n.default_locale is required")
+            # If locales map is provided in payload, ensure default locale has content
+            locales_map = data.get("locales")
+            if locales_map is not None:
+                default_has = bool((locales_map.get(default_locale) or {}).get("data", {}).get("content"))
+                if not default_has:
+                    abort(400, description="locales[default_locale].data.content is required")
     
     def get_notification_stats(self) -> Dict[str, Any]:
         """Get notification statistics"""

@@ -84,15 +84,17 @@ class DisplaySchema(Schema):
     style = fields.Nested(DisplayStyleSchema, load_default={})
 
 
+class I18NSchema(Schema):
+    """Schema para configuración i18n de notificaciones"""
+    default_locale = fields.String(required=True)
+    locales = fields.List(fields.String(), load_default=list)
+
+
 class NotificationCreateSchema(Schema):
     """Schema para crear notificaciones"""
     name = fields.String(
         required=True,
         validate=validate.Length(min=1, max=100, error="Name must be between 1 and 100 characters")
-    )
-    content = fields.String(
-        required=True,
-        validate=validate.Length(min=1, max=2000, error="Content must be between 1 and 2000 characters")
     )
     is_active = fields.Boolean(load_default=True)
     priority = fields.Integer(
@@ -101,6 +103,11 @@ class NotificationCreateSchema(Schema):
     )
     scheduling = fields.Nested(SchedulingSchema, required=True)
     display = fields.Nested(DisplaySchema, required=True)
+    locales = fields.Dict(
+        keys=fields.String(),
+        values=fields.Dict(),
+    )
+    i18n = fields.Nested(I18NSchema, required=True)
 
 
 class NotificationUpdateSchema(Schema):
@@ -108,26 +115,29 @@ class NotificationUpdateSchema(Schema):
     name = fields.String(
         validate=validate.Length(min=1, max=100, error="Name must be between 1 and 100 characters")
     )
-    content = fields.String(
-        validate=validate.Length(min=1, max=2000, error="Content must be between 1 and 2000 characters")
-    )
     is_active = fields.Boolean()
     priority = fields.Integer(
         validate=validate.Range(min=1, max=100, error="Priority must be between 1 and 100")
     )
     scheduling = fields.Nested(SchedulingSchema)
     display = fields.Nested(DisplaySchema)
+    locales = fields.Dict(
+        keys=fields.String(),
+        values=fields.Dict(),
+    )
+    i18n = fields.Nested(I18NSchema)
 
 
 class NotificationOutSchema(Schema):
     """Schema para respuesta de notificaciones"""
     id = fields.String(attribute="_id")
     name = fields.String()
-    content = fields.String()
     is_active = fields.Boolean()
     priority = fields.Integer()
     scheduling = fields.Nested(SchedulingSchema)
     display = fields.Nested(DisplaySchema)
+    locales = fields.Dict(keys=fields.String(), values=fields.Dict())
+    i18n = fields.Nested(I18NSchema)
     created_at = fields.DateTime()
     updated_at = fields.DateTime()
 
@@ -142,3 +152,12 @@ class NotificationCreateResponseSchema(Schema):
     """Schema para respuesta de creación"""
     id = fields.String()
     message = fields.String()
+
+
+class NotificationLocaleDataSchema(Schema):
+    content = fields.String(required=True, validate=validate.Length(min=1, max=2000))
+
+
+class NotificationLocaleUpdateSchema(Schema):
+    data = fields.Nested(NotificationLocaleDataSchema, required=True)
+    meta = fields.Dict(required=False)

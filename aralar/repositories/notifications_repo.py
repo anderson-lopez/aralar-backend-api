@@ -1,6 +1,8 @@
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from .base_repo import BaseRepository
+from aralar.config import BaseConfig as Config
 
 
 class NotificationsRepository(BaseRepository):
@@ -12,58 +14,67 @@ class NotificationsRepository(BaseRepository):
         # Sobrescribir con la instancia de db pasada
         self.collection = db["notifications"]
     
-    def find_active_notifications(self, current_time: datetime = None) -> List[Dict[str, Any]]:
+    def find_active_notifications(self, current_time: datetime = None, tzname: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Find notifications that should be active at the given time.
-        If no time is provided, uses current UTC time.
+        Find notifications that should be active at the given time using tenant timezone
+        for day-of-week and HH:MM, but UTC for date range in DB.
         """
+        tz = tzname or Config.TENANT_TIMEZONE
+        tzinfo = ZoneInfo(tz)
+        # Determine local now and corresponding UTC naive timestamp
         if current_time is None:
-            current_time = datetime.utcnow()
-        
-        # Get current day of week (0=Monday, 6=Sunday)
-        current_day = current_time.weekday()
+            now_local = datetime.now(tzinfo)
+        else:
+            # If passed time is naive, assume local tz; if aware, convert to local
+            now_local = current_time.replace(tzinfo=tzinfo) if current_time.tzinfo is None else current_time.astimezone(tzinfo)
+        now_utc = now_local.astimezone(timezone.utc).replace(tzinfo=None)
+
+        # Day-of-week and time in local tz
+        current_day = now_local.weekday()  # 0=Mon..6=Sun
         day_mapping = {0: 'MON', 1: 'TUE', 2: 'WED', 3: 'THU', 4: 'FRI', 5: 'SAT', 6: 'SUN'}
         current_day_str = day_mapping[current_day]
-        current_time_str = current_time.strftime('%H:%M')
-        
-        # Build query for active notifications
+        current_time_str = now_local.strftime('%H:%M')
+
+        # Build query for active notifications by UTC date window and optional day filter
         query = {
             "is_active": True,
-            "scheduling.start_date": {"$lte": current_time},
-            "scheduling.end_date": {"$gte": current_time},
+            "scheduling.start_date": {"$lte": now_utc},
+            "scheduling.end_date": {"$gte": now_utc},
             "$or": [
-                # No days specified (all days)
                 {"scheduling.days_of_week": {"$exists": False}},
                 {"scheduling.days_of_week": {"$size": 0}},
-                # Current day is in the list
-                {"scheduling.days_of_week": current_day_str}
-            ]
+                {"scheduling.days_of_week": current_day_str},
+            ],
         }
-        
-        # Get all candidate notifications
+
         candidates = list(self.collection.find(query).sort("priority", -1))
-        
-        # Filter by time range if specified
+
+        # Time-of-day filter with overnight window support
         active_notifications = []
         for notification in candidates:
             scheduling = notification.get('scheduling', {})
             time_start = scheduling.get('time_start')
             time_end = scheduling.get('time_end')
-            
-            # If no time constraints, include the notification
+
+            # No time constraints
             if not time_start and not time_end:
                 active_notifications.append(notification)
                 continue
-            
-            # If only one time is specified, skip time validation
+
+            # One-side constraint: include
             if not time_start or not time_end:
                 active_notifications.append(notification)
                 continue
-            
-            # Validate time range
-            if time_start <= current_time_str <= time_end:
-                active_notifications.append(notification)
-        
+
+            # Normal window
+            if time_start <= time_end:
+                if time_start <= current_time_str <= time_end:
+                    active_notifications.append(notification)
+            else:
+                # Overnight window (wrap over midnight)
+                if current_time_str >= time_start or current_time_str <= time_end:
+                    active_notifications.append(notification)
+
         return active_notifications
     
     def find_by_name(self, name: str) -> Optional[Dict[str, Any]]:
@@ -84,20 +95,30 @@ class NotificationsRepository(BaseRepository):
         """Update notification activation status"""
         return self.update_one(notification_id, {"is_active": is_active})
     
-    def find_expired_notifications(self, current_time: datetime = None) -> List[Dict[str, Any]]:
-        """Find notifications that have expired"""
+    def find_expired_notifications(self, current_time: datetime = None, tzname: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Find notifications that have expired (compare in UTC)"""
+        tz = tzname or Config.TENANT_TIMEZONE
+        tzinfo = ZoneInfo(tz)
         if current_time is None:
-            current_time = datetime.utcnow()
-        
+            now_local = datetime.now(tzinfo)
+        else:
+            now_local = current_time.replace(tzinfo=tzinfo) if current_time.tzinfo is None else current_time.astimezone(tzinfo)
+        now_utc = now_local.astimezone(timezone.utc).replace(tzinfo=None)
+
         return list(self.collection.find({
-            "scheduling.end_date": {"$lt": current_time}
+            "scheduling.end_date": {"$lt": now_utc}
         }))
     
-    def find_upcoming_notifications(self, current_time: datetime = None) -> List[Dict[str, Any]]:
-        """Find notifications that will start in the future"""
+    def find_upcoming_notifications(self, current_time: datetime = None, tzname: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Find notifications that will start in the future (compare in UTC)"""
+        tz = tzname or Config.TENANT_TIMEZONE
+        tzinfo = ZoneInfo(tz)
         if current_time is None:
-            current_time = datetime.utcnow()
-        
+            now_local = datetime.now(tzinfo)
+        else:
+            now_local = current_time.replace(tzinfo=tzinfo) if current_time.tzinfo is None else current_time.astimezone(tzinfo)
+        now_utc = now_local.astimezone(timezone.utc).replace(tzinfo=None)
+
         return list(self.collection.find({
-            "scheduling.start_date": {"$gt": current_time}
+            "scheduling.start_date": {"$gt": now_utc}
         }).sort("scheduling.start_date", 1))

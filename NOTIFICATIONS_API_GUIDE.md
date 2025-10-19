@@ -20,7 +20,6 @@ Content-Type: application/json
 
 {
   "name": "Promoción Fin de Semana",
-  "content": "🍷 <strong>Oferta especial:</strong> 20% descuento en vinos",
   "is_active": true,
   "priority": 8,
   "scheduling": {
@@ -38,14 +37,22 @@ Content-Type: application/json
       "text_color": "#FFFFFF",
       "custom_css_class": "wine-promo"
     }
+  },
+  "i18n": { "default_locale": "es-ES", "locales": ["es-ES", "en-GB"] },
+  "locales": {
+    "es-ES": { "data": { "content": "🍷 <strong>Oferta especial:</strong> 20% descuento en vinos" } },
+    "en-GB": { "data": { "content": "🍷 <strong>Special offer:</strong> 20% off wines" } }
   }
 }
 ```
 
 ### 2. Obtener Notificaciones Activas (Público)
 ```http
-GET /api/notifications/active
+GET /api/notifications/active?locale=es-ES&tz=Europe/Madrid
 ```
+Notas:
+- `locale` selecciona el contenido del idioma solicitado con fallback al `i18n.default_locale`.
+- `tz` es opcional (IANA). Por defecto, se usa la zona configurada del tenant.
 
 ### 3. Listar Todas las Notificaciones
 ```http
@@ -111,7 +118,6 @@ GET /api/notifications/upcoming
 
 ### 2. Validación de Campos
 - **name**: 1-100 caracteres, único
-- **content**: 1-2000 caracteres
 - **priority**: 1-100
 - **start_date**: Debe ser anterior a `end_date`
 - **time_start/time_end**: Formato HH:MM
@@ -119,6 +125,9 @@ GET /api/notifications/upcoming
 - **location**: Valores válidos: top-bar, hero-section, menu-section, contact-section, footer, global-modal, global-toast
 - **type**: Valores válidos: banner, card, modal, toast
 - **background_color/text_color**: Formato hexadecimal (#RRGGBB)
+- **i18n.default_locale**: Requerido
+- **i18n.locales**: Debe incluir el `default_locale`
+- **locales[default_locale].data.content**: Requerido (1-2000)
 
 ## Ejemplos de Uso
 
@@ -126,7 +135,6 @@ GET /api/notifications/upcoming
 ```json
 {
   "name": "Promoción Weekend",
-  "content": "🍷 <strong>Oferta especial de fin de semana:</strong> 20% de descuento en vinos seleccionados",
   "is_active": true,
   "priority": 8,
   "scheduling": {
@@ -143,6 +151,10 @@ GET /api/notifications/upcoming
       "background_color": "#8B0000",
       "text_color": "#FFFFFF"
     }
+  },
+  "i18n": { "default_locale": "es-ES", "locales": ["es-ES", "en-GB"] },
+  "locales": {
+    "es-ES": { "data": { "content": "🍷 <strong>Oferta especial de fin de semana:</strong> 20% de descuento en vinos seleccionados" } }
   }
 }
 ```
@@ -151,7 +163,6 @@ GET /api/notifications/upcoming
 ```json
 {
   "name": "Mantenimiento Cocina",
-  "content": "⚠️ Servicio limitado mañana por mantenimiento de cocina. Solo disponible menú frío.",
   "is_active": true,
   "priority": 10,
   "scheduling": {
@@ -167,6 +178,10 @@ GET /api/notifications/upcoming
       "background_color": "#FFA500",
       "text_color": "#000000"
     }
+  },
+  "i18n": { "default_locale": "es-ES", "locales": ["es-ES"] },
+  "locales": {
+    "es-ES": { "data": { "content": "⚠️ Servicio limitado mañana por mantenimiento de cocina. Solo disponible menú frío." } }
   }
 }
 ```
@@ -175,7 +190,6 @@ GET /api/notifications/upcoming
 ```json
 {
   "name": "Bienvenida Nuevos Clientes",
-  "content": "<h3>¡Bienvenido a Aralar!</h3><p>Descubre nuestra cocina tradicional con un toque moderno. <strong>Primera consumición gratis</strong> para nuevos clientes.</p>",
   "is_active": true,
   "priority": 5,
   "scheduling": {
@@ -190,6 +204,11 @@ GET /api/notifications/upcoming
     "style": {
       "custom_css_class": "welcome-modal"
     }
+  },
+  "i18n": { "default_locale": "es-ES", "locales": ["es-ES", "en-GB"] },
+  "locales": {
+    "es-ES": { "data": { "content": "<h3>¡Bienvenido a Aralar!</h3><p>Descubre nuestra cocina tradicional...</p>" } },
+    "en-GB": { "data": { "content": "<h3>Welcome to Aralar!</h3><p>Discover our cuisine...</p>" } }
   }
 }
 ```
@@ -225,7 +244,7 @@ El endpoint `/api/notifications/active` está diseñado para ser consumido por e
 // Ejemplo de consumo desde JavaScript
 async function loadActiveNotifications() {
   try {
-    const response = await fetch('/api/notifications/active');
+    const response = await fetch('/api/notifications/active?locale=es-ES');
     const notifications = await response.json();
     
     // Renderizar notificaciones en el DOM
@@ -246,7 +265,9 @@ Para crear la colección de notificaciones en MongoDB:
 python scripts/migrate.py
 ```
 
-Esto ejecutará la migración `007_create_notifications_collection.py` que:
+Esto ejecutará las migraciones relevantes:
+- `007_create_notifications_collection.py`
+- `012_notifications_locales_backfill.py` (migra `content` legacy a `locales.es-ES` y llena `i18n`)
 - Crea la colección `notifications`
 - Establece índices optimizados
 - Inserta datos de ejemplo

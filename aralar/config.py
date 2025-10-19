@@ -23,6 +23,7 @@ class BaseConfig:
     S3_SECRET_KEY = os.getenv("S3_SECRET_KEY", "minio123")
     S3_REGION = os.getenv("S3_REGION", "us-east-1")
     S3_BUCKET = os.getenv("S3_BUCKET", "aralar-media")
+    TENANT_TIMEZONE = os.getenv("TENANT_TIMEZONE", "Europe/Madrid")
     # seed defaults
     SEED_ADMIN_EMAIL = os.getenv("SEED_ADMIN_EMAIL", "admin@aralar.local")
     SEED_ADMIN_FULLNAME = os.getenv("SEED_ADMIN_FULLNAME", "Admin Aralar")
