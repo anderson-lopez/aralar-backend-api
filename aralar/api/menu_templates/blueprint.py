@@ -122,3 +122,20 @@ def archive_template(template_id):
         return {"message": "already archived"}
     svc.repo.update(template_id, {"status": "archived"})
     return {"message": "ok"}
+
+
+@blp.route("/<template_id>/unpublish", methods=["POST"])
+@require_permissions("menu_templates:publish")
+@blp.response(200, MenuTemplateMessageSchema)
+@blp.alt_response(404, schema=MenuTemplateMessageSchema)
+@blp.alt_response(409, schema=MenuTemplateMessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def unpublish_template(template_id):
+    """Move a published template back to draft status"""
+    svc = get_svc()
+    result = svc.unpublish(template_id)
+    if result is None:
+        abort(404, message="not found")
+    if isinstance(result, dict) and result.get("conflict"):
+        abort(409, message=result["conflict"])
+    return {"message": "ok"}
