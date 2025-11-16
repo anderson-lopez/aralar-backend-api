@@ -42,6 +42,9 @@ class MenuSchema(Schema):
 
 class MenuListSchema(Schema):
     items = fields.List(fields.Nested(MenuSchema))
+    total = fields.Integer()
+    skip = fields.Integer()
+    limit = fields.Integer()
 
 
 class MenuMessageSchema(Schema):
@@ -53,6 +56,8 @@ class MenuListQueryArgs(Schema):
     tenant_id = fields.String(required=False)
     template_slug = fields.String(required=False)
     template_version = fields.Integer(required=False)
+    skip = fields.Integer(load_default=0)
+    limit = fields.Integer(load_default=20)
 
 
 class PublicAvailableQueryArgs(Schema):
@@ -64,6 +69,7 @@ class PublicAvailableQueryArgs(Schema):
 
 class PublicFeaturedQueryArgs(Schema):
     """Schema for featured menus query parameters"""
+
     locale = fields.String(required=True)
     tz = fields.String(load_default="Europe/Madrid")
     date = fields.String(required=False)  # YYYY-MM-DD
@@ -86,12 +92,14 @@ class MenuPublicAvailableListSchema(Schema):
 
 class MenuFeaturedUpdateSchema(Schema):
     """Schema for updating featured status and order of a menu"""
+
     featured = fields.Boolean(required=True)
     featured_order = fields.Integer(required=False, allow_none=True)
 
 
 class MenuFeaturedItemSchema(Schema):
     """Schema for featured menu items returned to frontend"""
+
     id = fields.String()
     template_slug = fields.String()
     template_version = fields.Integer()
@@ -107,6 +115,7 @@ class MenuFeaturedItemSchema(Schema):
 
 class MenuFeaturedListSchema(Schema):
     """Schema for list of featured menus"""
+
     items = fields.List(fields.Nested(MenuFeaturedItemSchema))
 
 
@@ -121,7 +130,10 @@ class RenderQueryArgs(Schema):
 
 class RenderMultipleSchema(Schema):
     """Schema for rendering multiple menus at once"""
-    menu_ids = fields.List(fields.String(), required=True, validate=lambda x: len(x) <= 10)  # Max 10 menus
+
+    menu_ids = fields.List(
+        fields.String(), required=True, validate=lambda x: len(x) <= 10
+    )  # Max 10 menus
     locale = fields.String(required=True)
     fallback = fields.String(required=False)
     include_ui = fields.Boolean(load_default=False)
@@ -129,6 +141,7 @@ class RenderMultipleSchema(Schema):
 
 class RenderedMenuSchema(Schema):
     """Schema for a single rendered menu"""
+
     id = fields.String()
     tenant_id = fields.String()
     template = fields.Dict()
@@ -143,5 +156,6 @@ class RenderedMenuSchema(Schema):
 
 class RenderMultipleResponseSchema(Schema):
     """Schema for multiple rendered menus response"""
+
     items = fields.List(fields.Nested(RenderedMenuSchema))
     errors = fields.Dict(required=False)  # Map of menu_id -> error_message for failed renders

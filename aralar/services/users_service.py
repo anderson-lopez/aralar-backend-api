@@ -9,6 +9,17 @@ class UsersService:
     def __init__(self, repo):
         self.repo = repo
 
+    def list_users(self, skip: int = 0, limit: int = 20):
+        """List users with pagination, returning items, total, skip and limit."""
+        items = self.repo.list(skip=skip, limit=limit)
+        total = self.repo.count()
+        return {
+            "items": items,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        }
+
     def create_user(self, data: dict):
         """Create a new user with hashed password"""
         # Verificar que el email no exista (validación de negocio)

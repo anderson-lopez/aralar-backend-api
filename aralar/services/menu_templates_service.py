@@ -24,7 +24,7 @@ class MenuTemplatesService:
         except ValueError as e:
             return {"conflict": str(e)}
 
-    def list(self, status=None, slug=None, tenant_id=None):
+    def list(self, status=None, slug=None, tenant_id=None, skip=0, limit=20):
         f = {}
         if status:
             f["status"] = status
@@ -32,7 +32,16 @@ class MenuTemplatesService:
             f["slug"] = slug
         if tenant_id:
             f["tenant_id"] = tenant_id
-        return self.repo.list(f)
+
+        items = self.repo.list(f, skip=skip, limit=limit)
+        total = self.repo.count(f)
+
+        return {
+            "items": items,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        }
 
     def get(self, template_id: str):
         return self.repo.get(template_id)

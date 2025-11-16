@@ -18,6 +18,9 @@ class MenusRepo:
     def list(self, filters: dict, skip=0, limit=20):
         return list(self.col.find(filters).skip(skip).limit(limit).sort("updated_at", -1))
 
+    def count(self, filters: dict) -> int:
+        return self.col.count_documents(filters)
+
     def update(self, _id: str, patch: dict):
         patch["updated_at"] = datetime.utcnow()
         self.col.update_one({"_id": to_object_id(_id)}, {"$set": patch})
@@ -72,7 +75,11 @@ class MenusRepo:
             },
         }
         # Ordenar por featured_order (nulls last) y luego por updated_at
-        return list(self.col.find(q).sort([
-            ("featured_order", 1),  # Ascending order (lower numbers first)
-            ("updated_at", -1)      # Most recent first for same order
-        ]))
+        return list(
+            self.col.find(q).sort(
+                [
+                    ("featured_order", 1),  # Ascending order (lower numbers first)
+                    ("updated_at", -1),  # Most recent first for same order
+                ]
+            )
+        )

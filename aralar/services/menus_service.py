@@ -37,8 +37,40 @@ class MenusService:
         _id = self.repo.insert(doc)
         return self.repo.get(_id)
 
-    def list(self, filters: dict):
-        return self.repo.list(filters)
+    def list(self, query_args: dict):
+        """Lista menús con filtros opcionales y paginación.
+
+        query_args puede incluir: status, tenant_id, template_slug, template_version,
+        skip y limit. Este método construye los filtros de Mongo y devuelve
+        una estructura paginada con items, total, skip y limit.
+        """
+        filters: dict = {}
+
+        status = query_args.get("status")
+        tenant_id = query_args.get("tenant_id")
+        template_slug = query_args.get("template_slug")
+        template_version = query_args.get("template_version")
+        skip = query_args.get("skip", 0) or 0
+        limit = query_args.get("limit", 20) or 20
+
+        if status:
+            filters["status"] = status
+        if tenant_id:
+            filters["tenant_id"] = tenant_id
+        if template_slug:
+            filters["template_slug"] = template_slug
+        if template_version is not None:
+            filters["template_version"] = template_version
+
+        items = self.repo.list(filters, skip=skip, limit=limit)
+        total = self.repo.count(filters)
+
+        return {
+            "items": items,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        }
 
     def get(self, menu_id: str):
         return self.repo.get(menu_id)
@@ -149,14 +181,14 @@ class MenusService:
         m = self.repo.get(menu_id)
         if not m:
             return None
-        
+
         update_data = {"featured": featured}
         if featured_order is not None:
             update_data["featured_order"] = featured_order
         elif not featured:
             # If unfeaturing, remove the order
             update_data["featured_order"] = None
-            
+
         return self.repo.update(menu_id, update_data)
 
     def featured_available_on(self, locale: str, tzname: str, date_utc: datetime):
@@ -169,28 +201,37 @@ class MenusService:
 
     def featured_active_now(self, locale: str, tzname: str):
         """Lista menus destacados disponibles ahora"""
-        return self.featured_available_on(locale=locale, tzname=tzname, date_utc=datetime.now(timezone.utc))
+        return self.featured_available_on(
+            locale=locale, tzname=tzname, date_utc=datetime.now(timezone.utc)
+        )
 
-    def render_featured_menus(self, locale: str, tzname: str, fallback: Optional[str] = None, date_utc: Optional[datetime] = None, include_ui: bool = False):
+    def render_featured_menus(
+        self,
+        locale: str,
+        tzname: str,
+        fallback: Optional[str] = None,
+        date_utc: Optional[datetime] = None,
+        include_ui: bool = False,
+    ):
         """
         Devuelve lista de menus destacados completamente renderizados para mostrar en landing.
-        
+
         Args:
             locale: Idioma requerido (ej: 'es-ES')
             tzname: Zona horaria (ej: 'Europe/Madrid')
             fallback: Idioma de respaldo opcional
             date_utc: Fecha específica, si no se proporciona usa fecha actual
             include_ui: Si incluir manifest de UI en cada menu
-        
+
         Returns:
             Lista de menus renderizados ordenados por featured_order
         """
         if date_utc is None:
             date_utc = datetime.now(timezone.utc)
-            
+
         # Obtener menus destacados disponibles
         featured_menus = self.featured_available_on(locale=locale, tzname=tzname, date_utc=date_utc)
-        
+
         # Renderizar cada menu
         rendered_menus = []
         for menu in featured_menus:
@@ -198,13 +239,17 @@ class MenusService:
                 # Verificar que el menu esté publicado en el locale solicitado
                 pub = menu.get("publish", {})
                 if not pub.get(locale) or pub[locale].get("status") != "published":
-                    if not fallback or not pub.get(fallback) or pub[fallback].get("status") != "published":
+                    if (
+                        not fallback
+                        or not pub.get(fallback)
+                        or pub[fallback].get("status") != "published"
+                    ):
                         continue  # Skip this menu if not published
-                
+
                 # Renderizar el menu
                 result = self._merge_menu(menu, locale=locale, fallback=fallback)
                 data, meta = result["data"], result["meta"]
-                
+
                 rendered_menu = {
                     "id": str(menu["_id"]),
                     "template_slug": menu.get("template_slug"),
@@ -216,7 +261,7 @@ class MenusService:
                     "data": data,
                     "meta": meta,
                 }
-                
+
                 # Agregar UI manifest si se solicita
                 if include_ui:
                     tmpl = self.templates_repo.get_by_slug_version(
@@ -233,47 +278,55 @@ class MenusService:
                             sec_ui["key"] = sec.get("key")
                             sec_ui["labels"] = sec.get("label", {})
                             rendered_menu["ui"]["sections"].append(sec_ui)
-                
+
                 rendered_menus.append(rendered_menu)
-                
+
             except Exception as e:
                 # Log error but continue with other menus
                 print(f"Error rendering featured menu {menu.get('_id')}: {e}")
                 continue
-        
+
         # Ordenar por featured_order (None values al final)
         rendered_menus.sort(key=lambda x: (x["featured_order"] is None, x["featured_order"] or 0))
-        
+
         return rendered_menus
 
-    def render_multiple(self, menu_ids: List[str], locale: str, fallback: Optional[str] = None, include_ui: bool = False):
+    def render_multiple(
+        self,
+        menu_ids: List[str],
+        locale: str,
+        fallback: Optional[str] = None,
+        include_ui: bool = False,
+    ):
         """
         Renderiza múltiples menus de una vez.
-        
+
         Args:
             menu_ids: Lista de IDs de menus a renderizar
             locale: Idioma requerido
             fallback: Idioma de respaldo opcional
             include_ui: Si incluir manifest de UI
-            
+
         Returns:
             Dict con 'items' (menus renderizados) y 'errors' (errores por menu_id)
         """
         rendered_items = []
         errors = {}
-        
+
         for menu_id in menu_ids:
             try:
-                rendered_menu = self.render(menu_id, locale=locale, fallback=fallback, include_ui=include_ui)
+                rendered_menu = self.render(
+                    menu_id, locale=locale, fallback=fallback, include_ui=include_ui
+                )
                 rendered_items.append(rendered_menu)
             except Exception as e:
                 errors[menu_id] = str(e)
                 continue
-        
+
         result = {"items": rendered_items}
         if errors:
             result["errors"] = errors
-            
+
         return result
 
     def render(

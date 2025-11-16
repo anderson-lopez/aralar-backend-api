@@ -7,13 +7,17 @@ from marshmallow import Schema, fields, validate
 class UserCreateSchema(Schema):
     email = fields.Email(required=True)
     password = fields.String(
-        required=True, 
-        validate=validate.Length(min=8, max=128, error="Password must be between 8 and 128 characters")
+        required=True,
+        validate=validate.Length(
+            min=8, max=128, error="Password must be between 8 and 128 characters"
+        ),
     )
     confirm_password = fields.String(required=True)
     full_name = fields.String(
         required=True,
-        validate=validate.Length(min=1, max=50, error="Full name must be between 1 and 50 characters")
+        validate=validate.Length(
+            min=1, max=50, error="Full name must be between 1 and 50 characters"
+        ),
     )
     roles = fields.List(fields.String(), load_default=[])
     permissions_allow = fields.List(fields.String(), load_default=[])
@@ -43,7 +47,15 @@ class UserRolesUpdateSchema(Schema):
 
 class UserListResponseSchema(Schema):
     items = fields.List(fields.Nested(UserOutSchema))
+    total = fields.Integer()
+    skip = fields.Integer()
+    limit = fields.Integer()
 
 
 class UserCreateResponseSchema(Schema):
     id = fields.String()
+
+
+class UserListQueryArgs(Schema):
+    skip = fields.Integer(load_default=0)
+    limit = fields.Integer(load_default=20)

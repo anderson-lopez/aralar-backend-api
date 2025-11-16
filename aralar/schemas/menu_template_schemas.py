@@ -55,7 +55,9 @@ class FieldSchema(Schema):
             ]
         ),
     )
-    label = ma_fields.Dict(keys=ma_fields.String(), values=ma_fields.String(), required=False)  # i18n labels
+    label = ma_fields.Dict(
+        keys=ma_fields.String(), values=ma_fields.String(), required=False
+    )  # i18n labels
     required = ma_fields.Boolean(load_default=False)
     translatable = ma_fields.Boolean(load_default=False)
     maxLength = ma_fields.Integer(required=False)
@@ -92,8 +94,16 @@ class TemplateUISchema(Schema):
 
 class MenuTemplateCreateSchema(Schema):
     name = ma_fields.String(required=True)
-    slug = ma_fields.String(required=True, validate=validate.Regexp(r'^[a-z0-9-_]+$', error="Slug must contain only lowercase letters, numbers, hyphens, and underscores"))
-    version = ma_fields.Integer(load_default=1, validate=validate.Range(min=1, error="Version must be a positive integer"))
+    slug = ma_fields.String(
+        required=True,
+        validate=validate.Regexp(
+            r"^[a-z0-9-_]+$",
+            error="Slug must contain only lowercase letters, numbers, hyphens, and underscores",
+        ),
+    )
+    version = ma_fields.Integer(
+        load_default=1, validate=validate.Range(min=1, error="Version must be a positive integer")
+    )
     status = ma_fields.String(
         load_default="draft", validate=validate.OneOf(["draft", "published", "archived"])
     )
@@ -101,12 +111,12 @@ class MenuTemplateCreateSchema(Schema):
     i18n = ma_fields.Dict(required=False)
     sections = ma_fields.List(ma_fields.Nested(SectionSchema), required=True)
     ui = ma_fields.Nested(TemplateUISchema, required=False)  # <<--- NUEVO
-    
+
     @validates_schema
     def validate_slug_format(self, data, **kwargs):
-        slug = data.get('slug')
+        slug = data.get("slug")
         if slug and len(slug) > 100:
-            raise ValidationError('Slug must be 100 characters or less', 'slug')
+            raise ValidationError("Slug must be 100 characters or less", "slug")
 
 
 class MenuTemplateUpdateSchema(MenuTemplateCreateSchema):
@@ -137,6 +147,9 @@ class MenuTemplateSchema(Schema):
 
 class MenuTemplateListSchema(Schema):
     items = ma_fields.List(ma_fields.Nested(MenuTemplateSchema))
+    total = ma_fields.Integer()
+    skip = ma_fields.Integer()
+    limit = ma_fields.Integer()
 
 
 class IdSchema(Schema):
@@ -153,3 +166,5 @@ class MenuTemplateQueryArgs(Schema):
     )
     slug = ma_fields.String(required=False)
     tenant_id = ma_fields.String(required=False)
+    skip = ma_fields.Integer(load_default=0)
+    limit = ma_fields.Integer(load_default=20, validate=validate.Range(min=1, max=200))

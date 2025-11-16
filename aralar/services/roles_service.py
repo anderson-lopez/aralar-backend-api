@@ -3,8 +3,15 @@ class RolesService:
         self.repo = repo
 
     # Roles
-    def list_roles(self):
-        return self.repo.list_roles()
+    def list_roles(self, skip: int = 0, limit: int = 20):
+        items = self.repo.list_roles_paginated(skip=skip, limit=limit)
+        total = self.repo.count_roles()
+        return {
+            "items": items,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        }
 
     def get_role(self, name: str):
         return self.repo.get_role(name)
@@ -37,8 +44,15 @@ class RolesService:
         return self.repo.delete_role(name)
 
     # Permissions catalog
-    def list_permissions(self):
-        return self.repo.list_permissions()
+    def list_permissions(self, skip: int = 0, limit: int = 50):
+        items = self.repo.list_permissions_paginated(skip=skip, limit=limit)
+        total = self.repo.count_permissions()
+        return {
+            "items": items,
+            "total": total,
+            "skip": skip,
+            "limit": limit,
+        }
 
     def upsert_permission(self, name: str, data: dict):
         self.repo.upsert_permission(name=name, description=data.get("description", ""))

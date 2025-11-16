@@ -24,13 +24,13 @@ class UsersRepo:
         cur = self.col.find(filters or {}).skip(skip).limit(limit)
         return list(cur)
 
+    def count(self, filters=None) -> int:
+        """Count users matching optional filters."""
+        return self.col.count_documents(filters or {})
+
     def set_user_roles(self, _id: str, roles: List[str]):
         self.col.update_one(
-            {"_id": to_object_id(_id)}, 
-            {
-                "$set": {"roles": roles},
-                "$inc": {"perm_version": 1}
-            }
+            {"_id": to_object_id(_id)}, {"$set": {"roles": roles}, "$inc": {"perm_version": 1}}
         )
 
     def set_user_permissions(self, _id: str, allow: List[str], deny: List[str]):
@@ -45,36 +45,22 @@ class UsersRepo:
     def deactivate_user(self, _id: str):
         """Desactiva usuario e incrementa perm_version para invalidar tokens"""
         self.col.update_one(
-            {"_id": to_object_id(_id)},
-            {
-                "$set": {"active": False},
-                "$inc": {"perm_version": 1}
-            }
+            {"_id": to_object_id(_id)}, {"$set": {"active": False}, "$inc": {"perm_version": 1}}
         )
 
     def activate_user(self, _id: str):
         """Activa usuario e incrementa perm_version"""
         self.col.update_one(
-            {"_id": to_object_id(_id)},
-            {
-                "$set": {"active": True},
-                "$inc": {"perm_version": 1}
-            }
+            {"_id": to_object_id(_id)}, {"$set": {"active": True}, "$inc": {"perm_version": 1}}
         )
 
     def change_password(self, _id: str, password_hash: str):
         """Cambia contraseña e incrementa perm_version para invalidar tokens"""
         self.col.update_one(
             {"_id": to_object_id(_id)},
-            {
-                "$set": {"password": password_hash},
-                "$inc": {"perm_version": 1}
-            }
+            {"$set": {"password": password_hash}, "$inc": {"perm_version": 1}},
         )
 
     def increment_perm_version(self, _id: str):
         """Incrementa perm_version manualmente para invalidar tokens"""
-        self.col.update_one(
-            {"_id": to_object_id(_id)},
-            {"$inc": {"perm_version": 1}}
-        )
+        self.col.update_one({"_id": to_object_id(_id)}, {"$inc": {"perm_version": 1}})

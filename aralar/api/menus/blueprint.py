@@ -61,8 +61,8 @@ def create_menu(data):
 @blp.doc(security=[{"bearerAuth": []}])
 def list_menus(query_args):
     svc = get_svc()
-    items = svc.list(query_args)
-    return {"items": items}
+    result = svc.list(query_args)
+    return result
 
 
 @blp.route("/<menu_id>", methods=["GET"])
@@ -208,11 +208,7 @@ def set_menu_availability(payload, menu_id):
 def set_menu_featured(payload, menu_id):
     """Update featured status and order of a menu"""
     svc = get_svc()
-    doc = svc.update_featured(
-        menu_id, 
-        payload["featured"], 
-        payload.get("featured_order")
-    )
+    doc = svc.update_featured(menu_id, payload["featured"], payload.get("featured_order"))
     if not doc:
         abort(404, message="menu not found")
     return {"message": "ok"}
@@ -286,9 +282,13 @@ def public_featured(query):
             dt_utc = dt_local.astimezone(timezone.utc)
         except Exception:
             abort(400, message="invalid date")
-        items = svc.render_featured_menus(locale=locale, tzname=tzname, fallback=fallback, date_utc=dt_utc, include_ui=include_ui)
+        items = svc.render_featured_menus(
+            locale=locale, tzname=tzname, fallback=fallback, date_utc=dt_utc, include_ui=include_ui
+        )
     else:
-        items = svc.render_featured_menus(locale=locale, tzname=tzname, fallback=fallback, include_ui=include_ui)
+        items = svc.render_featured_menus(
+            locale=locale, tzname=tzname, fallback=fallback, include_ui=include_ui
+        )
 
     return {"items": items}
 
@@ -300,23 +300,23 @@ def public_featured(query):
 def render_multiple_menus(data):
     """
     Renderiza múltiples menus de una vez para optimizar requests del frontend.
-    
+
     Útil cuando necesitas renderizar varios menus específicos (no necesariamente destacados).
     Máximo 10 menus por request para evitar timeouts.
     """
     svc = get_svc()
-    
+
     # Validar que todos los IDs sean válidos
     for menu_id in data["menu_ids"]:
         _abort_if_invalid_id(menu_id)
-    
+
     result = svc.render_multiple(
         menu_ids=data["menu_ids"],
         locale=data["locale"],
         fallback=data.get("fallback"),
-        include_ui=data.get("include_ui", False)
+        include_ui=data.get("include_ui", False),
     )
-    
+
     return result
 
 

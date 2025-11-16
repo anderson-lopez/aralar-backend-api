@@ -16,6 +16,9 @@ class RoleCreateUpdateSchema(Schema):
 
 class RoleListSchema(Schema):
     items = fields.List(fields.Nested(RoleSchema))
+    total = fields.Integer()
+    skip = fields.Integer()
+    limit = fields.Integer()
 
 
 class PermissionSchema(Schema):
@@ -30,7 +33,20 @@ class PermissionUpsertSchema(Schema):
 
 class PermissionListSchema(Schema):
     items = fields.List(fields.Nested(PermissionSchema))
+    total = fields.Integer()
+    skip = fields.Integer()
+    limit = fields.Integer()
 
 
 class RoleMessageSchema(Schema):
     message = fields.String()
+
+
+class RoleListQueryArgs(Schema):
+    skip = fields.Integer(load_default=0)
+    limit = fields.Integer(load_default=20)
+
+
+class PermissionListQueryArgs(Schema):
+    skip = fields.Integer(load_default=0)
+    limit = fields.Integer(load_default=50)

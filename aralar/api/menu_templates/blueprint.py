@@ -58,8 +58,8 @@ def create_template(data):
 def list_templates(query_args):
     """List templates filtered by optional status, slug, and tenant_id"""
     svc = get_svc()
-    items = svc.list(**query_args)
-    return {"items": items}
+    result = svc.list(**query_args)
+    return result
 
 
 @blp.route("/<template_id>", methods=["GET"])

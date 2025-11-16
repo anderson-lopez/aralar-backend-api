@@ -3,11 +3,12 @@ from ...repositories.users_repo import UsersRepo
 from ...services.users_service import UsersService
 from ...schemas.user_schemas import (
     UserCreateSchema,
+    UserCreateResponseSchema,
     UserOutSchema,
+    UserListResponseSchema,
     UserPermsUpdateSchema,
     UserRolesUpdateSchema,
-    UserCreateResponseSchema,
-    UserListResponseSchema,
+    UserListQueryArgs,
 )
 from ...schemas.auth_schemas import ChangePasswordSchema
 from ...core.security import require_permissions
@@ -34,12 +35,13 @@ def create_user(user_data):
 
 @blp.route("", methods=["GET"])
 @blp.response(200, UserListResponseSchema)
+@blp.arguments(UserListQueryArgs, location="query")
 @blp.doc(security=[{"bearerAuth": []}])
 @require_permissions("users:read")
-def list_users():
+def list_users(query_args):
     svc = UsersService(UsersRepo(current_app.mongo_db))
-    docs = svc.repo.list(limit=50)
-    return {"items": docs}, 200
+    result = svc.list_users(**query_args)
+    return result, 200
 
 
 @blp.route("/<user_id>", methods=["GET"])

@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Any
 from bson import ObjectId
 
 
@@ -33,13 +33,26 @@ class RolesRepo:
     def list_permissions(self):
         return list(self.permissions.find({}))
 
+    def list_roles_paginated(self, skip: int = 0, limit: int = 20) -> List[Dict[str, Any]]:
+        """List roles with pagination, ordered by name."""
+        return list(self.roles.find({}).skip(skip).limit(limit).sort("name", 1))
+
+    def count_roles(self) -> int:
+        return self.roles.count_documents({})
+
+    def list_permissions_paginated(self, skip: int = 0, limit: int = 50) -> List[Dict[str, Any]]:
+        """List permissions with pagination, ordered by name."""
+        return list(self.permissions.find({}).skip(skip).limit(limit).sort("name", 1))
+
+    def count_permissions(self) -> int:
+        return self.permissions.count_documents({})
+
     def update_permission_by_id(self, permission_id: str, description: str = ""):
         """Update permission by ObjectId instead of name"""
         try:
             object_id = ObjectId(permission_id)
             result = self.permissions.update_one(
-                {"_id": object_id},
-                {"$set": {"description": description}}
+                {"_id": object_id}, {"$set": {"description": description}}
             )
             if result.matched_count == 0:
                 return None
