@@ -28,7 +28,7 @@ def get_svc():
 @require_permissions("roles:read")
 @blp.arguments(RoleListQueryArgs, location="query")
 @blp.response(200, RoleListSchema)
-@blp.doc(security=[["bearerAuth"]])
+@blp.doc(security=[{"bearerAuth": []}])
 def list_roles(query_args):
     svc = get_svc()
     result = svc.list_roles(**query_args)
@@ -94,7 +94,7 @@ def delete_role(name):
 @require_permissions("roles:permissions:read")
 @blp.arguments(PermissionListQueryArgs, location="query")
 @blp.response(200, PermissionListSchema)
-@blp.doc(security=[["bearerAuth"]])
+@blp.doc(security=[{"bearerAuth": []}])
 def list_permissions(query_args):
     svc = get_svc()
     result = svc.list_permissions(**query_args)
