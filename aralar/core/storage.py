@@ -3,12 +3,18 @@ from dataclasses import dataclass
 import boto3
 from botocore.config import Config as BotoConfig
 
+# --- CAMBIOS REALIZADOS PARA AWS S3 (Febrero 2026) ---
+# 1. Se ajustó la región por defecto a 'us-east-2' (Ohio) según la consola de AWS del usuario.
+# 2. Se incluyó 'ACL': 'public-read' en la firma del presigned_url. 
+#    ESTO REQUIERE: Habilitar ACLs en la consola de AWS (Pestaña Permisos > Propiedad de objetos).
+# 3. Se corrigió _build_public_url para usar el formato oficial de Amazon S3.
+# 4. Se eliminaron las referencias forzadas a linodeobjects.com.
+# ----------------------------------------------------
 
 @dataclass
 class PresignRequest:
     filename: str
     mime: str
-
 
 @dataclass
 class PresignResponse:
@@ -16,108 +22,89 @@ class PresignResponse:
     public_url: str
     key: str
 
-
 class StorageDriver:
     def presign_put(self, req: PresignRequest) -> PresignResponse:
         raise NotImplementedError
 
-
 class S3Storage(StorageDriver):
     def __init__(self):
+        # Configuración del cliente usando las variables del .env
         self.client = boto3.client(
             "s3",
             endpoint_url=os.getenv("S3_ENDPOINT"),
             aws_access_key_id=os.getenv("S3_ACCESS_KEY"),
             aws_secret_access_key=os.getenv("S3_SECRET_KEY"),
-            region_name=os.getenv("S3_REGION", "us-east-1"),
+            region_name=os.getenv("S3_REGION", "us-east-2"),
         )
-        self.bucket = os.getenv("S3_BUCKET", "aralar-media")
-        self.public_base = os.getenv(
-            "S3_PUBLIC_BASE"
-        )  # ej: https://aralar-media.us-east-1.linodeobjects.com
+        self.bucket = os.getenv("S3_BUCKET", "aralar-bucket")
+        self.public_base = os.getenv("S3_PUBLIC_BASE") 
         self.folder = os.getenv("S3_FOLDER", "menus")
 
     def presign_put(self, req: PresignRequest) -> PresignResponse:
-        print("[s3] presign_put")
+        print(f"[s3] Generando presign_put para el bucket: {self.bucket}")
 
         _key = f"{self.folder.rstrip('/')}/{uuid.uuid4()}-{req.filename}"
 
-        # Generate presigned URL for PUT operation with ACL
+        # Parámetros para la URL firmada
+        # Se incluye ACL para evitar el error 'HeadersNotSigned: x-amz-acl' en el proxy-put
+        params = {
+            "Bucket": self.bucket,
+            "Key": _key,
+            "ContentType": req.mime,
+            "ACL": "public-read",
+        }
+
         expiration = int(os.getenv("S3_PRESIGN_EXPIRATION", "300"))
+        
         upload_url = self.client.generate_presigned_url(
             "put_object",
-            Params={
-                "Bucket": self.bucket,
-                "Key": _key,
-                "ContentType": req.mime,
-                "ACL": "public-read",  # 🔑 ACL incluido en la firma
-            },
+            Params=params,
             ExpiresIn=expiration,
         )
 
-        # Construct public URL for Linode Object Storage
+        # Construcción de la URL pública para mostrar la imagen
         public_url = self._build_public_url(_key)
 
         return PresignResponse(upload_url=upload_url, public_url=public_url, key=_key)
 
     def make_object_public(self, key: str):
-        """Make an uploaded object public by setting its ACL."""
+        """Asegura que un objeto sea público mediante ACL."""
         try:
             self.client.put_object_acl(
                 Bucket=self.bucket,
                 Key=key,
                 ACL="public-read"
             )
-            print(f"[s3] Made object public: {key}")
+            print(f"[s3] Objeto marcado como público: {key}")
         except Exception as e:
-            print(f"[s3] Failed to make object public: {e}")
-            # No lanzamos excepción para no romper el flujo principal
+            print(f"[s3] Error al intentar hacer público el objeto: {e}")
 
     def _build_public_url(self, key: str) -> str:
-        """Build public URL for accessing the uploaded file in Linode Object Storage."""
+        """Construye la URL pública de acceso según el estándar de Amazon S3."""
         if self.public_base:
-            # Use explicit public base URL (recommended for Linode)
             return f"{self.public_base.rstrip('/')}/{key}"
 
-        # Fallback: construct URL from endpoint and bucket
-        endpoint = os.getenv("S3_ENDPOINT")
-        if endpoint:
-            # For Linode Object Storage, construct the public URL
-            # Format: https://bucket-name.region.linodeobjects.com/key
-            region = os.getenv("S3_REGION", "us-east-1")
-            if "linodeobjects.com" in endpoint:
-                return f"https://{self.bucket}.{region}.linodeobjects.com/{key}"
-            else:
-                # Generic S3-compatible endpoint
-                return f"{endpoint.rstrip('/')}/{self.bucket}/{key}"
-
-        # Last resort fallback
-        return f"/s3/{key}"
+        # Formato: https://bucket.s3.region.amazonaws.com/key
+        region = os.getenv("S3_REGION", "us-east-2")
+        return f"https://{self.bucket}.s3.{region}.amazonaws.com/{key}"
 
     def upload_direct(self, *, fileobj, filename: str, folder: str) -> PresignResponse:
-        """Upload file content directly to the bucket and return public URL and key."""
-        print("[s3] upload_direct")
-        print("[s3] bucket: ", self.bucket)
-        print("[s3] endpoint: ", os.getenv("S3_ENDPOINT"))
-        print("[s3] access_key: ", os.getenv("S3_ACCESS_KEY"))
-        print("[s3] secret_key: ", os.getenv("S3_SECRET_KEY"))
-        print("[s3] region: ", os.getenv("S3_REGION"))
-
+        """Sube contenido directamente al bucket (usado en proxy-put interno)."""
+        print("[s3] Ejecutando upload_direct")
         _key = f"{folder.rstrip('/')}/{uuid.uuid4()}-{filename}"
+        
         self.client.put_object(
             Bucket=self.bucket,
             Key=_key,
             Body=fileobj,
-            ACL="public-read",  # 🔑 CLAVE: Hace el archivo público
+            ACL="public-read",
         )
+        
         public_url = self._build_public_url(_key)
         return PresignResponse(upload_url="", public_url=public_url, key=_key)
-
 
 def get_storage() -> StorageDriver:
     driver = os.getenv("STORAGE_DRIVER", "s3")
     if driver == "s3":
         return S3Storage()
-    # Si más adelante agregas LocalStorage:
-    # if driver == "local": return LocalStorage()
     return S3Storage()
