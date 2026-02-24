@@ -3,6 +3,7 @@ from marshmallow import Schema, fields
 
 class MenuCreateSchema(Schema):
     tenant_id = fields.String(required=True)
+    name = fields.String(required=True)  # human-readable label to distinguish menus
     template_id = fields.String(required=False)  # either this...
     template_slug = fields.String(required=False)  # ...or these two
     template_version = fields.Integer(required=False)
@@ -17,6 +18,12 @@ class MenuCommonUpdateSchema(Schema):
     common = fields.Dict(required=True)
 
 
+class MenuGeneralUpdateSchema(Schema):
+    name = fields.String(required=False)
+    featured = fields.Boolean(required=False)
+    featured_order = fields.Integer(required=False, allow_none=True)
+
+
 class MenuLocaleUpdateSchema(Schema):
     data = fields.Dict(required=True)  # localized subtree for that locale
     meta = fields.Dict(required=False)
@@ -26,6 +33,7 @@ class MenuLocaleUpdateSchema(Schema):
 class MenuSchema(Schema):
     _id = fields.String(dump_only=True)
     tenant_id = fields.String()
+    name = fields.String()
     template_id = fields.String()
     template_slug = fields.String()
     template_version = fields.Integer()
@@ -54,6 +62,7 @@ class MenuMessageSchema(Schema):
 class MenuListQueryArgs(Schema):
     status = fields.String(required=False)
     tenant_id = fields.String(required=False)
+    name = fields.String(required=False)
     template_slug = fields.String(required=False)
     template_version = fields.Integer(required=False)
     skip = fields.Integer(load_default=0)
@@ -79,6 +88,7 @@ class PublicFeaturedQueryArgs(Schema):
 
 class MenuPublicItemSchema(Schema):
     id = fields.String()
+    name = fields.String()
     template_slug = fields.String()
     template_version = fields.Integer()
     updated_at = fields.DateTime(allow_none=True)
@@ -101,6 +111,7 @@ class MenuFeaturedItemSchema(Schema):
     """Schema for featured menu items returned to frontend"""
 
     id = fields.String()
+    name = fields.String()
     template_slug = fields.String()
     template_version = fields.Integer()
     title = fields.String()
@@ -143,6 +154,7 @@ class RenderedMenuSchema(Schema):
     """Schema for a single rendered menu"""
 
     id = fields.String()
+    name = fields.String()
     tenant_id = fields.String()
     template = fields.Dict()
     locale = fields.String()

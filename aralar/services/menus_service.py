@@ -24,6 +24,7 @@ class MenusService:
 
         doc = {
             "tenant_id": data["tenant_id"],
+            "name": data["name"],
             "template_id": str(tmpl["_id"]),
             "template_slug": tmpl["slug"],
             "template_version": tmpl["version"],
@@ -53,10 +54,14 @@ class MenusService:
         skip = query_args.get("skip", 0) or 0
         limit = query_args.get("limit", 20) or 20
 
+        name = query_args.get("name")
+
         if status:
             filters["status"] = status
         if tenant_id:
             filters["tenant_id"] = tenant_id
+        if name:
+            filters["name"] = {"$regex": name, "$options": "i"}
         if template_slug:
             filters["template_slug"] = template_slug
         if template_version is not None:
@@ -80,6 +85,18 @@ class MenusService:
         if not m:
             return None
         return self.repo.update(menu_id, {"common": common})
+
+    def update_general(self, menu_id: str, payload: dict):
+        m = self.repo.get(menu_id)
+        if not m:
+            return None
+        allowed = ("name", "featured", "featured_order")
+        patch = {k: v for k, v in payload.items() if k in allowed}
+        if not patch:
+            return m
+        if "featured" in patch and not patch["featured"] and "featured_order" not in patch:
+            patch["featured_order"] = None
+        return self.repo.update(menu_id, patch)
 
     def update_locale(self, menu_id: str, locale: str, data: dict, meta: Optional[dict] = None):
         m = self.repo.get(menu_id)
@@ -252,6 +269,7 @@ class MenusService:
 
                 rendered_menu = {
                     "id": str(menu["_id"]),
+                    "name": menu.get("name"),
                     "template_slug": menu.get("template_slug"),
                     "template_version": menu.get("template_version"),
                     "title": self.resolve_meta(menu, "title", locale, fallback),
@@ -347,6 +365,7 @@ class MenusService:
         data, meta = result["data"], result["meta"]
         payload = {
             "id": str(m["_id"]),
+            "name": m.get("name"),
             "tenant_id": m.get("tenant_id"),
             "template": {
                 "slug": m.get("template_slug"),

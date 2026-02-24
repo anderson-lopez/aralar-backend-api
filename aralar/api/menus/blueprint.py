@@ -8,6 +8,7 @@ from ...schemas.menu_availability_schemas import AvailabilitySchema
 from ...schemas.menu_schemas import (
     MenuCreateSchema,
     MenuCommonUpdateSchema,
+    MenuGeneralUpdateSchema,
     MenuLocaleUpdateSchema,
     MenuSchema,
     MenuListSchema,
@@ -90,6 +91,20 @@ def update_menu_common(body, menu_id):
     if not doc:
         abort(404, message="not found")
     return {"message": "ok"}
+
+
+@blp.route("/<menu_id>/general", methods=["PUT"])
+@require_permissions("menus:update")
+@blp.arguments(MenuGeneralUpdateSchema)
+@blp.response(200, MenuSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def update_menu_general(body, menu_id):
+    svc = get_svc()
+    doc = svc.update_general(menu_id, body)
+    if not doc:
+        abort(404, message="not found")
+    return doc
 
 
 @blp.route("/<menu_id>/validate", methods=["GET"])
@@ -246,6 +261,7 @@ def public_available(query):
         "items": [
             {
                 "id": str(x.get("_id")),
+                "name": x.get("name"),
                 "template_slug": x.get("template_slug"),
                 "template_version": x.get("template_version"),
                 "updated_at": x.get("updated_at"),
