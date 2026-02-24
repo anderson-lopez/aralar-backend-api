@@ -278,6 +278,7 @@ Authorization: Bearer <JWT_TOKEN>
 ```json
 {
   "tenant_id": "aralar",
+  "name": "Menú Aralar alérgenos",
   "template_slug": "aralar-allergen-menu",
   "template_version": 1,
   "status": "draft",
@@ -320,7 +321,8 @@ Authorization: Bearer <JWT_TOKEN>
 **Respuesta esperada:**
 ```json
 {
-  "id": "6720a1000000000000000003"
+  "_id": "6720a1000000000000000003",
+  "name": "Menú Aralar alérgenos"
 }
 ```
 
@@ -470,6 +472,7 @@ GET /api/menus/6720a1000000000000000003/render?locale=es-ES&with_ui=1
 ```json
 {
   "id": "6720a1000000000000000003",
+  "name": "Menú Aralar alérgenos",
   "template": { 
     "slug": "aralar-allergen-menu", 
     "version": 1 

@@ -406,6 +406,7 @@ Body
 ```json
 {
   "tenant_id": "aralar",
+  "name": "Carta otoño 2025",
   "template_slug": "seasonal-autumn",
   "template_version": 1,
   "status": "draft",
@@ -510,6 +511,7 @@ Respuesta (201)
 {
   "_id": "6740a1000000000000000003",
   "tenant_id": "aralar",
+  "name": "Carta otoño 2025",
   "template_slug": "seasonal-autumn",
   "template_version": 1,
   "status": "draft",
@@ -798,6 +800,7 @@ Respuesta (200)
   "items": [
     {
       "id": "6740a1000000000000000003",
+      "name": "Carta otoño 2025",
       "template_slug": "seasonal-autumn",
       "template_version": 1,
       "title": "Carta de Otoño",
@@ -824,6 +827,7 @@ Respuesta (200)
 ```json
 {
   "id": "6740a1000000000000000003",
+  "name": "Carta otoño 2025",
   "tenant_id": "aralar",
   "template": { "slug": "seasonal-autumn", "version": 1 },
   "locale": "es-ES",
@@ -959,6 +963,7 @@ Respuesta (200) con UI manifest completo:
 ```json
 {
   "id": "6740a1000000000000000003",
+  "name": "Carta otoño 2025",
   "tenant_id": "aralar",
   "template": { "slug": "seasonal-autumn", "version": 1 },
   "locale": "es-ES",

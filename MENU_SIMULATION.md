@@ -117,6 +117,7 @@ Body
 ```json
 {
   "tenant_id": "aralar",
+  "name": "Menú diario 5 septiembre",
   "template_slug": "daily-basic",
   "template_version": 1,
   "status": "draft",
@@ -135,6 +136,7 @@ Respuesta (201) (resumen)
 {
   "_id": "64f1a1333333333333333333",
   "tenant_id": "aralar",
+  "name": "Menú diario 5 septiembre",
   "template_id": "64f1a1222222222222222222",
   "template_slug": "daily-basic",
   "template_version": 1,
@@ -290,6 +292,7 @@ Respuesta (200)
   "items": [
     {
       "id": "64f1a1333333333333333333",
+      "name": "Menú diario 5 septiembre",
       "template_slug": "daily-basic",
       "template_version": 1,
       "title": "Menú del día",
@@ -315,6 +318,7 @@ Respuesta (200) (ejemplo)
 ```json
 {
   "id": "64f1a1333333333333333333",
+  "name": "Menú diario 5 septiembre",
   "tenant_id": "aralar",
   "template": { "slug": "daily-basic", "version": 1 },
   "locale": "es-ES",
@@ -349,6 +353,7 @@ Respuesta (200) con UI manifest completo:
 ```json
 {
   "id": "64f1a1333333333333333333",
+  "name": "Menú diario 5 septiembre",
   "tenant_id": "aralar",
   "template": { "slug": "daily-basic", "version": 1 },
   "locale": "es-ES",

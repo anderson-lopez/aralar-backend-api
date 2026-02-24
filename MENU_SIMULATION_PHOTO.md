@@ -152,6 +152,7 @@ Body
 ```json
 {
   "tenant_id": "aralar",
+  "name": "Menú sencillo con fotos",
   "template_slug": "simple-photo",
   "template_version": 1,
   "status": "draft",
@@ -185,7 +186,7 @@ Body
 
 Respuesta (201)
 ```json
-{ "_id": "6710a1000000000000000003", "tenant_id": "aralar", "template_slug": "simple-photo", "template_version": 1, "status": "draft", "common": { "header": { "banner_image": { "url": "https://cdn.example.com/menus/banners/uuid-banner.webp", "mime": "image/webp", "width": 1600, "height": 600, "size": 210000 } }, "dishes": [ { "_id": "dish-ensalada", "price": 6.0, "image": { "url": "https://cdn.example.com/menus/dishes/uuid-ensalada.webp", "mime": "image/webp", "width": 1200, "height": 900, "size": 180000 } }, { "_id": "dish-sopa", "price": 5.0 } ] }, "locales": {}, "publish": {} }
+{ "_id": "6710a1000000000000000003", "tenant_id": "aralar", "name": "Menú sencillo con fotos", "template_slug": "simple-photo", "template_version": 1, "status": "draft", "common": { "header": { "banner_image": { "url": "https://cdn.example.com/menus/banners/uuid-banner.webp", "mime": "image/webp", "width": 1600, "height": 600, "size": 210000 } }, "dishes": [ { "_id": "dish-ensalada", "price": 6.0, "image": { "url": "https://cdn.example.com/menus/dishes/uuid-ensalada.webp", "mime": "image/webp", "width": 1200, "height": 900, "size": 180000 } }, { "_id": "dish-sopa", "price": 5.0 } ] }, "locales": {}, "publish": {} }
 ```
 
 > Guarda `menu_id = "6710a1000000000000000003"`.
@@ -324,6 +325,7 @@ Respuesta (200)
   "items": [
     {
       "id": "6710a1000000000000000003",
+      "name": "Menú sencillo con fotos",
       "template_slug": "simple-photo",
       "template_version": 1,
       "title": "Menú sencillo con fotos",
@@ -344,6 +346,7 @@ Respuesta (200)
 ```json
 {
   "id": "6710a1000000000000000003",
+  "name": "Menú sencillo con fotos",
   "template": { "slug": "simple-photo", "version": 1 },
   "locale": "es-ES",
   "meta": {
@@ -389,6 +392,7 @@ Respuesta (200) con UI manifest completo:
 ```json
 {
   "id": "6710a1000000000000000003",
+  "name": "Menú sencillo con fotos",
   "template": { "slug": "simple-photo", "version": 1 },
   "locale": "es-ES",
   "ui": {
@@ -465,7 +469,7 @@ Respuesta (200) con UI manifest completo:
 # Create simple-photo menu (draft)
 curl -X POST http://localhost:5000/api/menus \
  -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" \
- -d '{ "tenant_id":"aralar","template_slug":"simple-photo","template_version":1,"status":"draft","common":{"header":{"banner_image":{"url":"https://cdn.example.com/menus/banners/uuid-banner.webp","mime":"image/webp","width":1600,"height":600,"size":210000}},"dishes":[{"_id":"dish-ensalada","price":6.0,"image":{"url":"https://cdn.example.com/menus/dishes/uuid-ensalada.webp","mime":"image/webp","width":1200,"height":900,"size":180000}},{"_id":"dish-sopa","price":5.0}]}}'
+ -d '{ "tenant_id":"aralar","name":"Menú sencillo con fotos","template_slug":"simple-photo","template_version":1,"status":"draft","common":{"header":{"banner_image":{"url":"https://cdn.example.com/menus/banners/uuid-banner.webp","mime":"image/webp","width":1600,"height":600,"size":210000}},"dishes":[{"_id":"dish-ensalada","price":6.0,"image":{"url":"https://cdn.example.com/menus/dishes/uuid-ensalada.webp","mime":"image/webp","width":1200,"height":900,"size":180000}},{"_id":"dish-sopa","price":5.0}]}}'
 ```
 
 ---

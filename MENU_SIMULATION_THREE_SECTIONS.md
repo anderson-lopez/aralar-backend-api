@@ -241,6 +241,7 @@ POST `/api/menus`
 ```json
 {
   "tenant_id": "aralar",
+  "name": "Carta 3 secciones",
   "template_slug": "three-sections-multiimages",
   "template_version": 1,
   "status": "draft",
@@ -347,7 +348,7 @@ POST `/api/menus`
 
 Respuesta (201)
 ```json
-{ "id": "6750a1000000000000000003" }
+{ "_id": "6750a1000000000000000003", "name": "Carta 3 secciones" }
 ```
 
 ---
@@ -508,6 +509,7 @@ Respuesta (200)
   "items": [
     {
       "id": "6750a1000000000000000003",
+      "name": "Carta 3 secciones",
       "template_slug": "three-sections-multiimages",
       "template_version": 1,
       "title": "Carta — 3 secciones",
@@ -533,6 +535,7 @@ Respuesta (200)
 ```json
 {
   "id": "6750a1000000000000000003",
+  "name": "Carta 3 secciones",
   "tenant_id": "aralar",
   "template": { "slug": "three-sections-multiimages", "version": 1 },
   "locale": "es-ES",

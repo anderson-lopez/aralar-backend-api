@@ -245,6 +245,7 @@ Authorization: Bearer <JWT_TOKEN>
 ```json
 {
   "tenant_id": "aralar",
+  "name": "Menú diario básico UI",
   "template_slug": "daily-basic-ui",
   "template_version": 1,
   "status": "draft",
@@ -270,6 +271,7 @@ Authorization: Bearer <JWT_TOKEN>
 ```json
 {
   "_id": "6730a1000000000000000003",
+  "name": "Menú diario básico UI",
   "template_slug": "daily-basic-ui",
   "template_version": 1,
   "status": "draft",
@@ -452,6 +454,7 @@ GET /api/menus/public/available?locale=es-ES&tz=Europe/Madrid
   "items": [
     {
       "id": "6730a1000000000000000003",
+      "name": "Menú diario básico UI",
       "template_slug": "daily-basic-ui",
       "template_version": 1,
       "title": "Menú del día",
@@ -475,6 +478,7 @@ Si no existe `meta` para `fr-FR`, se resuelve desde `en-GB`:
   "items": [
     {
       "id": "6730a1000000000000000003",
+      "name": "Menú diario básico UI",
       "template_slug": "daily-basic-ui",
       "template_version": 1,
       "title": "Daily Menu",
@@ -498,6 +502,7 @@ GET /api/menus/6730a1000000000000000003/render?locale=es-ES&with_ui=1
 ```json
 {
   "id": "6730a1000000000000000003",
+  "name": "Menú diario básico UI",
   "template": {
     "slug": "daily-basic-ui",
     "version": 1
