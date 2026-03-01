@@ -25,7 +25,7 @@ class UsersService:
         # Verificar que el email no exista (validación de negocio)
         existing_user = self.repo.find_by_email(data["email"])
         if existing_user:
-            raise ValueError("Email already exists")
+            abort(409, message="Email already exists")
 
         # Crear el usuario
         hashed = ph.hash(data.pop("password"))
@@ -45,7 +45,7 @@ class UsersService:
         if not user:
             abort(404, message="User not found", error="user_not_found")
         if not ph.verify(user["password_hash"], data["old_password"]):
-            raise ValueError("Old password is incorrect")
+            abort(400, message="Old password is incorrect")
 
         hashed = ph.hash(data["new_password"])
         # Usar el nuevo método que incrementa perm_version automáticamente
