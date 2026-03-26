@@ -38,3 +38,8 @@ class MenuTemplatesRepo:
         patch["updated_at"] = datetime.utcnow()
         self.col.update_one({"_id": to_object_id(_id)}, {"$set": patch})
         return self.get(_id)
+
+    def delete(self, _id: str) -> int:
+        """Delete a template by ID and return the number of deleted documents"""
+        result = self.col.delete_one({"_id": to_object_id(_id)})
+        return result.deleted_count

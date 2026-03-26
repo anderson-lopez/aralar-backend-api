@@ -52,6 +52,38 @@ class UsersService:
         self.repo.change_password(user_id, hashed)
         return True
 
+    def update_user(self, user_id: str, data: dict):
+        """Update user profile fields (email, full_name). Validates existence and email uniqueness."""
+        user = self.repo.find_by_id(user_id)
+        if not user:
+            abort(404, message="User not found", error="user_not_found")
+
+        allowed_fields = {"email", "full_name", "roles", "permissions_allow", "permissions_deny"}
+        patch = {k: v for k, v in data.items() if k in allowed_fields}
+
+        if not patch:
+            abort(400, message="No valid fields to update", error="validation_error")
+
+        if "email" in patch and patch["email"] != user.get("email"):
+            existing = self.repo.find_by_email(patch["email"])
+            if existing:
+                abort(409, message="Email already exists", error="email_conflict")
+
+        patch["updated_at"] = datetime.utcnow()
+        return self.repo.update_user(user_id, patch)
+
+    def delete_user(self, user_id: str):
+        """Delete a user by ID. Validates existence before deletion."""
+        user = self.repo.find_by_id(user_id)
+        if not user:
+            abort(404, message="User not found", error="user_not_found")
+        
+        deleted_count = self.repo.delete_user(user_id)
+        if deleted_count == 0:
+            abort(500, message="Failed to delete user", error="deletion_failed")
+        
+        return True
+
     def verify_credentials(self, email, password):
         user = self.repo.find_by_email(email)
         if not user or not user.get("password_hash"):

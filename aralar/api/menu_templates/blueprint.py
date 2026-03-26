@@ -1,6 +1,7 @@
 from flask_smorest import Blueprint, abort
 from flask import current_app
 from ...repositories.menu_templates_repo import MenuTemplatesRepo
+from ...repositories.menus_repo import MenusRepo
 from ...services.menu_templates_service import MenuTemplatesService
 from ...schemas.menu_template_schemas import (
     MenuTemplateCreateSchema,
@@ -139,3 +140,40 @@ def unpublish_template(template_id):
     if isinstance(result, dict) and result.get("conflict"):
         abort(409, message=result["conflict"])
     return {"message": "ok"}
+
+
+@blp.route("/<template_id>/unarchive", methods=["POST"])
+@require_permissions("menu_templates:archive")
+@blp.response(200, MenuTemplateMessageSchema)
+@blp.alt_response(404, schema=MenuTemplateMessageSchema)
+@blp.alt_response(409, schema=MenuTemplateMessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def unarchive_template(template_id):
+    """Restore an archived template back to draft status"""
+    svc = get_svc()
+    result = svc.unarchive(template_id)
+    if result is None:
+        abort(404, message="not found")
+    if isinstance(result, dict) and result.get("conflict"):
+        abort(409, message=result["conflict"])
+    return {"message": "ok"}
+
+
+@blp.route("/<template_id>", methods=["DELETE"])
+@require_permissions("menu_templates:delete")
+@blp.response(200, MenuTemplateMessageSchema)
+@blp.alt_response(404, schema=MenuTemplateMessageSchema)
+@blp.alt_response(409, schema=MenuTemplateMessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def delete_template(template_id):
+    """Delete a template if no menus are using it"""
+    svc = get_svc()
+    menus_repo = MenusRepo(current_app.mongo_db)
+    
+    result = svc.delete_template(template_id, menus_repo)
+    if result is None:
+        abort(404, message="Template not found")
+    if isinstance(result, dict) and result.get("conflict"):
+        abort(409, message=result["conflict"])
+    
+    return {"message": "Template deleted successfully"}

@@ -43,10 +43,7 @@ class LoginSchema(Schema):
     )
     password = fields.String(
         required=True,
-        validate=[
-            validate.Length(min=8, max=128, error="Password must be between 8 and 128 characters"),
-            validate_password_strength,
-        ],
+        validate=validate.Length(min=8, max=128, error="Password must be between 8 and 128 characters"),
         metadata={"example": "ChangeMeNow!2025", "description": "User password"},
     )
 

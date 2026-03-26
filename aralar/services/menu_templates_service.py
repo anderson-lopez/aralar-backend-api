@@ -105,3 +105,49 @@ class MenuTemplatesService:
             return {"conflict": "only published templates can be unpublished"}
         self.repo.update(template_id, {"status": "draft"})
         return template_id
+
+    def unarchive(self, template_id: str):
+        """Restore an archived template back to draft status.
+        
+        Args:
+            template_id: ID of the template to unarchive
+            
+        Returns:
+            template_id if successful, None if not found, or dict with conflict message
+        """
+        t = self.repo.get(template_id)
+        if not t:
+            return None
+        if t.get("status") != "archived":
+            return {"conflict": "only archived templates can be unarchived"}
+        self.repo.update(template_id, {"status": "draft"})
+        return template_id
+
+    def delete_template(self, template_id: str, menus_repo):
+        """Delete a template after validating no menus are using it.
+        
+        Args:
+            template_id: ID of the template to delete
+            menus_repo: MenusRepo instance to check for associated menus
+            
+        Returns:
+            template_id if successful, None if not found, or dict with conflict message
+        """
+        t = self.repo.get(template_id)
+        if not t:
+            return None
+        
+        # Check if any menus are using this template
+        menus_count = menus_repo.count_by_template(t["slug"], t["version"])
+        
+        if menus_count > 0:
+            return {
+                "conflict": f"Cannot delete template: {menus_count} menu(s) are using this template (slug: '{t['slug']}', version: {t['version']})"
+            }
+        
+        # Safe to delete - no menus are using this template
+        deleted_count = self.repo.delete(template_id)
+        if deleted_count == 0:
+            return {"conflict": "Failed to delete template"}
+        
+        return template_id

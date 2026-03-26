@@ -83,3 +83,10 @@ class MenusRepo:
                 ]
             )
         )
+
+    def count_by_template(self, template_slug: str, template_version: int) -> int:
+        """Count menus using a specific template by slug and version"""
+        return self.col.count_documents({
+            "template_slug": template_slug,
+            "template_version": template_version
+        })

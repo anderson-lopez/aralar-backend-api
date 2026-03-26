@@ -42,6 +42,14 @@ class UsersRepo:
             },
         )
 
+    def update_user(self, _id: str, patch: dict):
+        """Updates user profile fields and increments perm_version to invalidate tokens"""
+        self.col.update_one(
+            {"_id": to_object_id(_id)},
+            {"$set": patch, "$inc": {"perm_version": 1}},
+        )
+        return self.find_by_id(_id)
+
     def deactivate_user(self, _id: str):
         """Desactiva usuario e incrementa perm_version para invalidar tokens"""
         self.col.update_one(
@@ -64,3 +72,8 @@ class UsersRepo:
     def increment_perm_version(self, _id: str):
         """Incrementa perm_version manualmente para invalidar tokens"""
         self.col.update_one({"_id": to_object_id(_id)}, {"$inc": {"perm_version": 1}})
+
+    def delete_user(self, _id: str) -> int:
+        """Elimina un usuario por ID y retorna el número de documentos eliminados"""
+        result = self.col.delete_one({"_id": to_object_id(_id)})
+        return result.deleted_count

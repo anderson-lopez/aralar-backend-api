@@ -27,11 +27,11 @@ def main():
 
     # Catálogo de permisos y roles (idempotente) desde un único origen
     # Solo crear permisos que no existen, preservando descripciones existentes
-    for p in DEFAULT_PERMISSIONS:
+    for name, description in DEFAULT_PERMISSIONS.items():
         db["permissions"].update_one(
-            {"name": p}, 
-            {"$setOnInsert": {"description": ""}}, 
-            upsert=True
+            {"name": name},
+            {"$setOnInsert": {"name": name, "description": description}},
+            upsert=True,
         )
 
     for name, data in ROLE_TEMPLATES.items():

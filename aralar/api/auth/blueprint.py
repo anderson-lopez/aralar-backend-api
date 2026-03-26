@@ -41,6 +41,7 @@ blp = Blueprint("auth", "auth", description="Auth endpoints")
 @blp.response(200, LoginResponseSchema)
 @blp.alt_response(400, schema=AuthErrorSchema)
 @blp.alt_response(401, schema=AuthErrorSchema)
+@blp.alt_response(403, schema=AuthErrorSchema)
 @limiter.limit("5/minute")  # frena fuerza bruta
 def login(login_data):
     """Authenticate user and return JWT tokens"""
@@ -53,8 +54,14 @@ def login(login_data):
     if not user:
         abort(401, message="Invalid email or password", error="authentication_failed")
 
+    if not user.get("is_active", True):
+        abort(403, message="Account is deactivated. Please contact an administrator.", error="account_inactive")
+
     resolved_roles = roles_repo.resolve_roles(user.get("roles", []))
     claims = jwt_claims_from_user(user, resolved_roles=resolved_roles)
+
+    if not claims.get("permissions"):
+        abort(403, message="No permissions assigned. Please contact an administrator.", error="no_permissions")
 
     # Generar JTI único para el token
     import uuid

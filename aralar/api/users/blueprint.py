@@ -6,8 +6,10 @@ from ...schemas.user_schemas import (
     UserCreateResponseSchema,
     UserOutSchema,
     UserListResponseSchema,
+    UserUpdateSchema,
     UserPermsUpdateSchema,
     UserRolesUpdateSchema,
+    UserDeleteResponseSchema,
     UserListQueryArgs,
 )
 from ...schemas.auth_schemas import ChangePasswordSchema
@@ -55,6 +57,29 @@ def get_user(user_id):
     if not doc:
         return {"error": "User not found"}, 404
     return doc, 200
+
+
+@blp.route("/<user_id>", methods=["PUT"])
+@blp.arguments(UserUpdateSchema)
+@blp.response(200, UserOutSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+@require_permissions("users:update")
+@validate_object_id("user_id")
+def update_user(user_data, user_id):
+    svc = UsersService(UsersRepo(current_app.mongo_db))
+    doc = svc.update_user(user_id, user_data)
+    return doc, 200
+
+
+@blp.route("/<user_id>", methods=["DELETE"])
+@blp.response(200, UserDeleteResponseSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+@require_permissions("users:delete")
+@validate_object_id("user_id")
+def delete_user(user_id):
+    svc = UsersService(UsersRepo(current_app.mongo_db))
+    svc.delete_user(user_id)
+    return {"message": "User deleted successfully"}, 200
 
 
 @blp.route("/<user_id>/permissions", methods=["PUT"])
