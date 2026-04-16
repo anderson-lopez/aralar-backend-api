@@ -80,7 +80,7 @@ def get_menu(menu_id):
 
 
 @blp.route("/<menu_id>", methods=["DELETE"])
-@require_permissions("menus:archive")
+@require_permissions("menus:delete")
 @blp.response(200, MenuMessageSchema)
 @blp.alt_response(404, schema=MenuMessageSchema)
 @blp.doc(security=[{"bearerAuth": []}])
