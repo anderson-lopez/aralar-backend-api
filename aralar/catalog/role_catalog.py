@@ -25,6 +25,7 @@ DEFAULT_PERMISSIONS: dict[str, str] = {
     "menus:create": "Crear menús",
     "menus:update": "Editar menús, traducciones y archivos",
     "menus:delete": "Eliminar menús",
+    "menus:archive": "Archivar menús",
     "menus:publish": "Publicar menús",
     # menu templates
     "menu_templates:read": "Ver plantillas de menú",
