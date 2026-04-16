@@ -79,6 +79,20 @@ def get_menu(menu_id):
     return doc
 
 
+@blp.route("/<menu_id>", methods=["DELETE"])
+@require_permissions("menus:archive")
+@blp.response(200, MenuMessageSchema)
+@blp.alt_response(404, schema=MenuMessageSchema)
+@blp.doc(security=[{"bearerAuth": []}])
+def delete_menu(menu_id):
+    """Elimina definitivamente un menú."""
+    svc = get_svc()
+    ok = svc.delete(menu_id)
+    if not ok:
+        abort(404, message="not found")
+    return {"message": "ok"}
+
+
 @blp.route("/<menu_id>/common", methods=["PUT"])
 @require_permissions("menus:update")
 @blp.arguments(MenuCommonUpdateSchema)

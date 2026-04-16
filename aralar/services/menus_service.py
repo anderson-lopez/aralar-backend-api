@@ -80,6 +80,14 @@ class MenusService:
     def get(self, menu_id: str):
         return self.repo.get(menu_id)
 
+    def delete(self, menu_id: str) -> bool:
+        """Elimina definitivamente el menú. Devuelve True si se eliminó, False si no existía."""
+        m = self.repo.get(menu_id)
+        if not m:
+            return False
+        self.repo.delete(menu_id)
+        return True
+
     def update_common(self, menu_id: str, common: dict):
         m = self.repo.get(menu_id)
         if not m:

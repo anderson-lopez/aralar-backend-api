@@ -26,6 +26,12 @@ class MenusRepo:
         self.col.update_one({"_id": to_object_id(_id)}, {"$set": patch})
         return self.get(_id)
 
+    def delete(self, _id: str) -> int:
+        """Elimina definitivamente un menú de la colección.
+        Devuelve el número de documentos eliminados (0 o 1)."""
+        res = self.col.delete_one({"_id": to_object_id(_id)})
+        return res.deleted_count
+
     def set_availability(self, _id: str, availability: dict):
         """Guarda el bloque de disponibilidad normalizado en el documento."""
         update = {
