@@ -28,3 +28,40 @@ line-length = 100
 
 [tool.ruff]
 line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--cov=aralar",
+    "--cov-report=term-missing",
+    "--cov-report=html:htmlcov",
+]
+markers = [
+    "unit: tests unitarios puros (sin Flask, sin Mongo)",
+    "integration: tests que usan mongomock",
+    "e2e: tests end-to-end que usan el test_client HTTP",
+    "slow: tests que tardan >1s",
+]
+
+[tool.coverage.run]
+source = ["aralar"]
+omit = [
+    "*/tests/*",
+    "*/scripts/*",
+    "*/docs/*",
+    "aralar/app.py",
+    "aralar/config.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

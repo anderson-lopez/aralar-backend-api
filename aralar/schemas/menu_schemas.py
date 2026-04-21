@@ -74,6 +74,7 @@ class PublicAvailableQueryArgs(Schema):
     tz = fields.String(load_default="Europe/Madrid")
     date = fields.String(required=False)  # YYYY-MM-DD
     fallback = fields.String(required=False)
+    images_limit = fields.Integer(load_default=10)  # máx. URLs de imagen por menu
 
 
 class PublicFeaturedQueryArgs(Schema):
@@ -94,6 +95,7 @@ class MenuPublicItemSchema(Schema):
     updated_at = fields.DateTime(allow_none=True)
     title = fields.String()
     summary = fields.String()
+    preview_images = fields.List(fields.String())
 
 
 class MenuPublicAvailableListSchema(Schema):

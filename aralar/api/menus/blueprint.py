@@ -256,6 +256,7 @@ def public_available(query):
     fallback = query.get("fallback")
     tzname = query.get("tz") or "Europe/Madrid"
     date_str = query.get("date")
+    images_limit = query.get("images_limit", 10)
 
     svc = get_svc()
 
@@ -281,6 +282,7 @@ def public_available(query):
                 "updated_at": x.get("updated_at"),
                 "title": svc.resolve_meta(x, "title", locale, fallback),
                 "summary": svc.resolve_meta(x, "summary", locale, fallback),
+                "preview_images": svc.extract_image_urls(x, limit=images_limit),
             }
             for x in items
         ]

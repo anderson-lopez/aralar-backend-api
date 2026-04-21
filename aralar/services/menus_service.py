@@ -471,3 +471,48 @@ class MenusService:
             or (loc.get(fallback, {}).get("meta", {}) or {}).get(key)
             or (m.get("common", {}).get("meta", {}) or {}).get(key)
         )
+
+    def extract_image_urls(self, menu_doc: dict, limit: int = 10) -> List[str]:
+        """Recorre recursivamente `common` y devuelve URLs de imagen encontradas.
+
+        Una imagen es cualquier dict con clave `url` (string no vacío). Si el
+        dict incluye `mime`, debe empezar por `image/` para aceptarlo. Esto
+        permite soportar distintos esquemas (`image`, `images`, `banner_image`,
+        galerías, etc.) sin acoplarse a nombres de campos.
+
+        Preserva el orden de aparición, deduplica por URL y respeta `limit`.
+        """
+        urls: List[str] = []
+        seen: set = set()
+
+        def _looks_like_image(d: dict) -> bool:
+            url = d.get("url")
+            if not isinstance(url, str) or not url:
+                return False
+            mime = d.get("mime")
+            if isinstance(mime, str) and mime and not mime.lower().startswith("image/"):
+                return False
+            return True
+
+        def _walk(node):
+            if limit is not None and len(urls) >= limit:
+                return
+            if isinstance(node, dict):
+                if _looks_like_image(node):
+                    url = node["url"]
+                    if url not in seen:
+                        seen.add(url)
+                        urls.append(url)
+                    return  # no descender dentro de un objeto imagen
+                for v in node.values():
+                    _walk(v)
+                    if limit is not None and len(urls) >= limit:
+                        return
+            elif isinstance(node, list):
+                for v in node:
+                    _walk(v)
+                    if limit is not None and len(urls) >= limit:
+                        return
+
+        _walk(menu_doc.get("common", {}))
+        return urls
