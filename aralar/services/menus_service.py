@@ -92,7 +92,93 @@ class MenusService:
         m = self.repo.get(menu_id)
         if not m:
             return None
-        return self.repo.update(menu_id, {"common": common})
+        # Limpia los locales: cuando un campo cambia de translatable=True a
+        # translatable=False, los valores viejos quedaban en
+        # locales.<lang>.data y, al mergear para render, pisaban al common.
+        # Borramos en cada save cualquier clave que ahora viva en common,
+        # dejando los locales solo con campos genuinamente traducibles.
+        locales = m.get("locales", {}) or {}
+        cleaned_locales = self._strip_common_keys_from_locales(common, locales)
+        patch: dict = {"common": common}
+        if cleaned_locales != locales:
+            patch["locales"] = cleaned_locales
+        return self.repo.update(menu_id, patch)
+
+    # ─── Cleanup helpers ────────────────────────────────────────────────────
+
+    def _strip_common_keys_from_locales(self, common: dict, locales: dict) -> dict:
+        """Devuelve un nuevo `locales` sin las claves que ya viven en `common`.
+
+        Se recorren las estructuras en paralelo (dicts y listas-con-_id). Las
+        claves presentes en `common` se consideran no-traducibles y por tanto
+        se eliminan del bloque equivalente en cada locale. Los campos que solo
+        existen en locale (los genuinamente traducibles, p.ej. ``name``,
+        ``description``) se preservan tal cual.
+        """
+        if not isinstance(locales, dict) or not locales:
+            return locales
+        result = {}
+        for lang, loc in locales.items():
+            if not isinstance(loc, dict):
+                result[lang] = loc
+                continue
+            data = loc.get("data") or {}
+            cleaned_data = self._strip_keys_in_parallel(common, data)
+            new_loc = dict(loc)
+            new_loc["data"] = cleaned_data
+            result[lang] = new_loc
+        return result
+
+    def _strip_keys_in_parallel(self, common_node, locale_node):
+        """Recorre ``common_node`` y ``locale_node`` en paralelo. Si una clave
+        existe en common, se elimina del locale (se considera no-traducible).
+        Si es un contenedor (dict o list-con-_id), baja recursivamente para
+        limpiar niveles internos sin borrar los campos traducibles que
+        conviven dentro del mismo item.
+        """
+        # Listas de items con _id: limpiar por _id (matching de items).
+        if (
+            isinstance(common_node, list)
+            and isinstance(locale_node, list)
+            and all(isinstance(x, dict) and "_id" in x for x in common_node)
+        ):
+            by_id = {x["_id"]: x for x in common_node if isinstance(x, dict)}
+            result = []
+            for loc_item in locale_node:
+                if not isinstance(loc_item, dict):
+                    result.append(loc_item)
+                    continue
+                lid = loc_item.get("_id")
+                if lid in by_id:
+                    result.append(self._strip_keys_in_parallel(by_id[lid], loc_item))
+                else:
+                    # item solo en locale: se preserva (no hay common con el
+                    # que comparar).
+                    result.append(loc_item)
+            return result
+
+        # Dicts: quitar claves que existan en common; si el valor en common es
+        # contenedor, bajar recursivamente para preservar traducibles anidados.
+        if isinstance(common_node, dict) and isinstance(locale_node, dict):
+            result = {}
+            for k, v in locale_node.items():
+                if k == "_id":
+                    result[k] = v
+                    continue
+                if k in common_node:
+                    cv = common_node[k]
+                    if isinstance(cv, (dict, list)) and isinstance(v, (dict, list)):
+                        nested = self._strip_keys_in_parallel(cv, v)
+                        if nested not in (None, {}, []):
+                            result[k] = nested
+                    # Valor atómico en common → se borra del locale.
+                else:
+                    # Clave solo en locale: traducible, preservar.
+                    result[k] = v
+            return result
+
+        # Tipos no coincidentes o atómicos: no sabemos qué limpiar.
+        return locale_node
 
     def update_general(self, menu_id: str, payload: dict):
         m = self.repo.get(menu_id)
@@ -435,10 +521,15 @@ class MenusService:
     def _deep_merge_sections(self, base, override):
         """
         Reglas:
-          - dict: fusiona recursivo, override pisa base
+          - dict: fusiona recursivo. Si una clave existe en AMBOS lados con
+            valor concreto, gana ``base`` (common). El override solo rellena
+            claves que no están en common — así los campos no-traducibles
+            siempre muestran el valor de common, incluso si en el pasado
+            quedaron residuos en los locales (ej. un campo que fue
+            translatable=True y luego pasó a translatable=False).
           - list con objetos que tienen '_id': mezcla por _id
           - list normal: override pisa base
-          - atómico: override si no es None, si no, base
+          - atómico: base si no es None/"" ; si lo es, override
         """
         # list de bloques con _id: merge por _id
         if isinstance(base, list) and all(isinstance(x, dict) and "_id" in x for x in base):
@@ -458,11 +549,20 @@ class MenusService:
             for k, v in override.items():
                 if k == "_id":
                     continue
+                if k in base:
+                    bv = base[k]
+                    if bv is not None and bv != "":
+                        if isinstance(bv, (dict, list)) and isinstance(v, (dict, list)):
+                            res[k] = self._deep_merge_sections(bv, v)
+                        # else: common atómico no-vacío → no tocar.
+                        continue
                 res[k] = self._deep_merge_sections(base.get(k), v)
             return res
 
-        # valores atómicos / listas simples
-        return override if override is not None else base
+        # valores atómicos / listas simples: si base tiene valor, base manda.
+        if base is not None and base != "":
+            return base
+        return override
 
     def resolve_meta(self, m, key, locale, fallback: Optional[str] = None):
         loc = m.get("locales", {})
