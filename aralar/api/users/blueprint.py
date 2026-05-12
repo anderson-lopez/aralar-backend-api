@@ -17,6 +17,8 @@ from ...core.security import require_permissions
 from ...core.validators import validate_object_id
 from marshmallow import ValidationError
 from flask import current_app
+from flask_jwt_extended import get_jwt_identity
+from flask_smorest import abort
 
 blp = Blueprint("users", "users", description="Users endpoints")
 
@@ -77,7 +79,16 @@ def update_user(user_data, user_id):
 @require_permissions("users:delete")
 @validate_object_id("user_id")
 def delete_user(user_id):
+    # Reglas anti-softlock:
+    #   1) Nadie puede eliminarse a sí mismo.
+    #   2) Nadie puede eliminar al ÚLTIMO admin activo (invariante: el
+    #      sistema siempre debe tener >=1 admin activo).
+    # El frontend deshabilita/oculta los botones; aquí va la defensa real.
+    if str(get_jwt_identity()) == str(user_id):
+        abort(400, message="No puedes eliminar tu propio usuario.")
     svc = UsersService(UsersRepo(current_app.mongo_db))
+    if svc.is_last_active_admin(user_id):
+        abort(400, message="No se puede eliminar al último admin activo del sistema.")
     svc.delete_user(user_id)
     return {"message": "User deleted successfully"}, 200
 
@@ -105,7 +116,16 @@ def update_user_permissions(permissions_data, user_id):
 @validate_object_id("user_id")
 def update_user_roles(roles_data, user_id):
     svc = UsersService(UsersRepo(current_app.mongo_db))
-    svc.repo.set_user_roles(user_id, roles_data["roles"])
+    new_roles = roles_data["roles"]
+    # Si el target es el último admin activo y la nueva lista de roles le
+    # quita 'admin', dejaríamos al sistema sin ningún admin operativo →
+    # softlock. Se rechaza.
+    if svc.is_last_active_admin(user_id) and "admin" not in new_roles:
+        abort(
+            400,
+            message="No se puede quitar el rol admin al último admin activo del sistema.",
+        )
+    svc.repo.set_user_roles(user_id, new_roles)
     doc = svc.repo.find_by_id(user_id)
     return doc, 200
 
@@ -127,7 +147,14 @@ def activate_user(user_id):
 @require_permissions("users:activate")
 @validate_object_id("user_id")
 def deactivate_user(user_id):
+    # Reglas anti-softlock (idénticas a delete):
+    #   1) Nadie puede desactivarse a sí mismo.
+    #   2) Nadie puede desactivar al último admin activo del sistema.
+    if str(get_jwt_identity()) == str(user_id):
+        abort(400, message="No puedes desactivar tu propio usuario.")
     svc = UsersService(UsersRepo(current_app.mongo_db))
+    if svc.is_last_active_admin(user_id):
+        abort(400, message="No se puede desactivar al último admin activo del sistema.")
     doc = svc.repo.update(user_id, {"is_active": False})
     return doc, 200
 

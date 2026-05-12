@@ -93,3 +93,27 @@ class UsersService:
             return user
         except Exception:
             return None
+
+    def is_last_active_admin(self, user_id: str) -> bool:
+        """
+        Devuelve True si el usuario indicado es el ÚNICO admin activo del
+        sistema. Si lo es, cualquier acción que le quite ese estado
+        (eliminar, desactivar, quitarle el rol 'admin') dejaría al sistema
+        sin ningún admin operativo (softlock total) y debe rechazarse.
+
+        Considera "activo" a usuarios con is_active != False (los documentos
+        antiguos sin ese campo se interpretan como activos).
+        """
+        user = self.repo.find_by_id(user_id)
+        if not user:
+            return False
+        roles = user.get("roles") or []
+        if "admin" not in roles:
+            return False
+        if user.get("is_active", True) is False:
+            return False
+        active_admin_count = self.repo.count({
+            "is_active": {"$ne": False},
+            "roles": "admin",
+        })
+        return active_admin_count <= 1
