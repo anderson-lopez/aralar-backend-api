@@ -130,14 +130,29 @@ def auth_headers(app, db):
     from bson import ObjectId
     from flask_jwt_extended import create_access_token
 
-    # Permisos más comunes del sistema. Si tu módulo usa uno nuevo, agrégalo aquí.
+    # Permisos del sistema. Reflejan los strings usados en @require_permissions(...)
+    # a lo largo de aralar/api/. Si tu módulo usa uno nuevo, agrégalo aquí.
     DEFAULT_PERMISSIONS = [
-        "menus:create", "menus:read", "menus:update", "menus:delete", "menus:publish",
-        "menu-templates:create", "menu-templates:read", "menu-templates:update", "menu-templates:delete",
+        # Menús
+        "menus:create", "menus:read", "menus:update", "menus:delete",
+        "menus:publish", "menus:archive",
+        # Templates (¡con underscore — el código usa "menu_templates", no "menu-templates"!)
+        "menu_templates:create", "menu_templates:read", "menu_templates:update",
+        "menu_templates:delete", "menu_templates:publish", "menu_templates:archive",
+        # Users
         "users:create", "users:read", "users:update", "users:delete",
-        "roles:read", "roles:update",
+        "users:activate", "users:assign_roles", "users:assign_permissions",
+        "users:change_password",
+        # Roles
+        "roles:read", "roles:create", "roles:update", "roles:delete",
+        "roles:permissions:read", "roles:permissions:update",
+        # Notifications
         "notifications:read", "notifications:create",
+        "notifications:update", "notifications:delete",
+        # Uploads (los endpoints usan menus:update porque suben para un menú)
         "uploads:create",
+        # Auth ops
+        "auth:invalidate_tokens", "auth:view_blacklist",
     ]
 
     def _make(email: str = "test@aralar.local",
