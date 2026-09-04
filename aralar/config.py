@@ -17,6 +17,7 @@ class BaseConfig:
     DEEPL_BASE_URL = os.getenv("DEEPL_BASE_URL", "https://api.deepl.com/v2")
     GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
     GOOGLE_BASE_URL = os.getenv("GOOGLE_BASE_URL", "https://translation.googleapis.com/language/translate/v2")
+    NLLB_BASE_URL = os.getenv("NLLB_BASE_URL", "http://nllb:8000")
     # S3 / object storage
     S3_ENDPOINT = os.getenv("S3_ENDPOINT", "http://localhost:9000")
     S3_ACCESS_KEY = os.getenv("S3_ACCESS_KEY", "minio")
@@ -24,6 +25,24 @@ class BaseConfig:
     S3_REGION = os.getenv("S3_REGION", "us-east-1")
     S3_BUCKET = os.getenv("S3_BUCKET", "aralar-media")
     TENANT_TIMEZONE = os.getenv("TENANT_TIMEZONE", "Europe/Madrid")
+    DEFAULT_TENANT_ID = os.getenv("DEFAULT_TENANT_ID", "aralar")
+    # reseñas de Google
+    # provider: "manual" (alta desde el panel) | "scraper" (endpoint interno de Maps)
+    GOOGLE_REVIEWS_PROVIDER = os.getenv("GOOGLE_REVIEWS_PROVIDER", "manual").lower()
+    GOOGLE_REVIEWS_AUTO_APPROVE_MIN_RATING = int(
+        os.getenv("GOOGLE_REVIEWS_AUTO_APPROVE_MIN_RATING", "4")
+    )
+    # Identificación del local: basta con una de las dos (el feature id se extrae de la URL)
+    GOOGLE_MAPS_PLACE_URL = os.getenv("GOOGLE_MAPS_PLACE_URL", "")
+    GOOGLE_MAPS_FEATURE_ID = os.getenv("GOOGLE_MAPS_FEATURE_ID", "")  # 0x...:0x...
+    GOOGLE_REVIEWS_LOCALE = os.getenv("GOOGLE_REVIEWS_LOCALE", "es")
+    GOOGLE_REVIEWS_MAX_PAGES = int(os.getenv("GOOGLE_REVIEWS_MAX_PAGES", "10"))
+    GOOGLE_REVIEWS_TIMEOUT = int(os.getenv("GOOGLE_REVIEWS_TIMEOUT", "20"))
+    GOOGLE_REVIEWS_USER_AGENT = os.getenv(
+        "GOOGLE_REVIEWS_USER_AGENT",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    )
     # seed defaults
     SEED_ADMIN_EMAIL = os.getenv("SEED_ADMIN_EMAIL", "admin@aralar.local")
     SEED_ADMIN_FULLNAME = os.getenv("SEED_ADMIN_FULLNAME", "Admin Aralar")

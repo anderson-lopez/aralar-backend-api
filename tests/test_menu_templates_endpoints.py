@@ -131,21 +131,70 @@ class TestPublishTemplate:
 
 
 @pytest.mark.e2e
+class TestDuplicateTemplate:
+    """POST /api/menu-templates/<id>/duplicate. Requiere `menu_templates:create`."""
+
+    def test_returns_401_without_token(self, client, db):
+        tmpl = seed_template(db)
+        res = client.post(f"/api/menu-templates/{tmpl['_id']}/duplicate", json={})
+        assert res.status_code == 401
+
+    def test_returns_403_without_create_permission(self, client, db, auth_headers):
+        tmpl = seed_template(db)
+        res = client.post(
+            f"/api/menu-templates/{tmpl['_id']}/duplicate",
+            json={},
+            headers=auth_headers(permissions=["menu_templates:read"]),
+        )
+        assert res.status_code == 403
+
+    def test_returns_404_when_template_not_found(self, client, auth_headers):
+        from bson import ObjectId
+        res = client.post(
+            f"/api/menu-templates/{ObjectId()}/duplicate",
+            json={},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 404
+
+    def test_duplicates_with_derived_slug_and_returns_201(self, client, db, auth_headers):
+        tmpl = seed_template(db, slug="carta", version=2, status="published")
+        res = client.post(
+            f"/api/menu-templates/{tmpl['_id']}/duplicate",
+            json={},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 201
+        assert "id" in res.json
+        stored = db["menu_templates"].find_one({"slug": "carta-copy"})
+        assert stored is not None
+        assert stored["status"] == "draft"
+        assert stored["version"] == 1
+
+    def test_returns_409_when_explicit_slug_exists(self, client, db, auth_headers):
+        tmpl = seed_template(db, slug="base", version=1)
+        seed_template(db, slug="ocupado", version=1)
+        res = client.post(
+            f"/api/menu-templates/{tmpl['_id']}/duplicate",
+            json={"slug": "ocupado"},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 409
+
+
+@pytest.mark.e2e
 class TestUpdateTemplate:
     """
     PUT /api/menu-templates/<id>
 
-    El schema de update extiende al de create y exige el payload completo
-    (name, slug, tenant_id, sections...). Replicamos esa estructura aquí.
+    El schema de update NO hereda del de create: `slug`, `version`, `tenant_id`
+    y `status` son identidad y no se aceptan (422). Solo se editan `name`,
+    `i18n`, `sections` y `ui`.
     """
 
     def _full_payload(self, name="Renombrado"):
         return {
-            "tenant_id": "aralar",
             "name": name,
-            "slug": "any-slug",
-            "version": 1,
-            "status": "draft",
             "i18n": {"default_locale": "es-ES", "locales": ["es-ES"]},
             "sections": [{
                 "key": "items", "label": {"es-ES": "Items"}, "repeatable": True,
@@ -183,6 +232,33 @@ class TestUpdateTemplate:
         assert res.status_code == 200
         stored = db["menu_templates"].find_one({"_id": tmpl["_id"]})
         assert stored["name"] == "Cambiado"
+
+    @pytest.mark.parametrize("identity_field,value", [
+        ("slug", "otro-slug"),
+        ("version", 2),
+        ("tenant_id", "otro-tenant"),
+        ("status", "published"),
+    ])
+    def test_rejects_identity_fields(self, client, db, auth_headers, identity_field, value):
+        """slug/version/tenant_id/status son identidad: 422, no cambio silencioso.
+
+        Renombrar el slug dejaría huérfanos a los menús que apuntan a
+        (template_slug, template_version): perderían el `ui` en /render y
+        `delete_template` dejaría de contarlos.
+        """
+        tmpl = seed_template(db, slug="estable", status="draft")
+        payload = self._full_payload()
+        payload[identity_field] = value
+
+        res = client.put(
+            f"/api/menu-templates/{tmpl['_id']}",
+            json=payload,
+            headers=auth_headers(),
+        )
+        assert res.status_code == 422
+        stored = db["menu_templates"].find_one({"_id": tmpl["_id"]})
+        assert stored["slug"] == "estable"
+        assert stored["version"] == 1
 
 
 @pytest.mark.e2e

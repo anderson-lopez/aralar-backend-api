@@ -6,6 +6,7 @@ from ...services.menu_templates_service import MenuTemplatesService
 from ...schemas.menu_template_schemas import (
     MenuTemplateCreateSchema,
     MenuTemplateUpdateSchema,
+    MenuTemplateDuplicateSchema,
     MenuTemplatePublishSchema,
     MenuTemplateSchema,
     MenuTemplateListSchema,
@@ -92,6 +93,30 @@ def update_template(patch, template_id):
     if isinstance(result, dict) and result.get("conflict"):
         abort(409, message=result["conflict"])
     return {"message": "ok"}
+
+
+@blp.route("/<template_id>/duplicate", methods=["POST"])
+@require_permissions("menu_templates:create")
+@blp.arguments(MenuTemplateDuplicateSchema)
+@blp.response(201, IdSchema)
+@blp.alt_response(404, schema=MenuTemplateMessageSchema)
+@blp.alt_response(409, schema=MenuTemplateMessageSchema)
+@blp.alt_response(422, schema=MenuTemplateMessageSchema, description="Validation error")
+@blp.doc(security=[{"bearerAuth": []}])
+def duplicate_template(body, template_id):
+    """Duplica un template como nuevo draft con slug derivado.
+
+    Copia sections/ui/i18n; resetea status a draft y version a 1. Si no se pasa
+    `slug`, deriva "<slug>-copy" (resolviendo colisiones). Acepta `name` y
+    `slug` opcionales en el body.
+    """
+    svc = get_svc()
+    result = svc.duplicate(template_id, slug=body.get("slug"), name=body.get("name"))
+    if result is None:
+        abort(404, message="not found")
+    if isinstance(result, dict) and result.get("conflict"):
+        abort(409, message=result["conflict"])
+    return {"id": result}
 
 
 @blp.route("/<template_id>/publish", methods=["POST"])

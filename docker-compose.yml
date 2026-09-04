@@ -49,10 +49,36 @@ services:
       retries: 5
       start_period: 30s
 
+  # Microservicio de traducción local con NLLB (facebook/nllb-200-distilled-600M)
+  # Solo necesario cuando I18N_PROVIDER=nllb en el .env de la API
+  nllb:
+    build:
+      context: ./services/nllb
+      dockerfile: Dockerfile
+    container_name: aralar-nllb
+    environment:
+      - HF_HOME=/cache/huggingface
+      - DEVICE=cpu
+    volumes:
+      - hf_cache:/cache/huggingface
+    ports:
+      - "8001:8000"
+    networks:
+      - aralar-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
 networks:
   aralar-network:
     driver: bridge
 
 volumes:
   mongo_data:
+    driver: local
+  hf_cache:
     driver: local

@@ -1,4 +1,4 @@
-.PHONY: help install run test clean docker-build docker-up docker-down docker-logs docker-init docker-restart
+.PHONY: help install run test clean docker-build docker-up docker-down docker-logs docker-init docker-restart sync-reviews docker-sync-reviews
 
 help:
 	@echo "=== Aralar API - Comandos Disponibles ==="
@@ -21,6 +21,10 @@ help:
 	@echo "Base de datos:"
 	@echo "  seed          - Ejecutar seed de datos iniciales"
 	@echo "  migrate       - Ejecutar migraciones"
+	@echo ""
+	@echo "Reseñas de Google:"
+	@echo "  sync-reviews  - Sincronizar reseñas (local)"
+	@echo "  docker-sync-reviews - Sincronizar reseñas (Docker)"
 
 # Desarrollo local
 install:
@@ -45,6 +49,8 @@ docker-init:
 	sleep 15
 	docker-compose exec api python scripts/migrate.py
 	docker-compose exec api python scripts/seed.py
+	@docker-compose exec api python scripts/sync_google_reviews.py --if-empty || \
+		echo "[AVISO] Reseñas de Google no sincronizadas (revisa el .env). La API arranca igualmente."
 	@echo "¡Configuración completa! API disponible en http://localhost:8000"
 
 # Docker - Operaciones básicas
@@ -80,3 +86,10 @@ docker-seed:
 
 docker-migrate:
 	docker-compose exec api python scripts/migrate.py
+
+# Reseñas de Google
+sync-reviews:
+	python scripts/sync_google_reviews.py
+
+docker-sync-reviews:
+	docker-compose exec api python scripts/sync_google_reviews.py

@@ -139,6 +139,12 @@ def auth_headers(app, db):
         # Templates (¡con underscore — el código usa "menu_templates", no "menu-templates"!)
         "menu_templates:create", "menu_templates:read", "menu_templates:update",
         "menu_templates:delete", "menu_templates:publish", "menu_templates:archive",
+        # Menu services (clasificación "Otros servicios")
+        "menu_services:create", "menu_services:read", "menu_services:update",
+        "menu_services:delete",
+        # Google reviews (reseñas de la landing)
+        "google_reviews:create", "google_reviews:read", "google_reviews:update",
+        "google_reviews:delete", "google_reviews:moderate", "google_reviews:sync",
         # Users
         "users:create", "users:read", "users:update", "users:delete",
         "users:activate", "users:assign_roles", "users:assign_permissions",

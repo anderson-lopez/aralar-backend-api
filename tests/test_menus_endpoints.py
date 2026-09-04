@@ -16,7 +16,7 @@ Cuándo NO usar E2E:
 """
 import pytest
 
-from tests.factories import seed_menu, seed_template, make_image
+from tests.factories import seed_menu, seed_template, make_image, seed_menu_service
 
 
 # =============================================================================
@@ -50,7 +50,8 @@ class TestPublicAvailable:
         assert len(items) == 1
         expected_keys = {
             "id", "name", "template_slug", "template_version",
-            "updated_at", "title", "summary", "preview_images",
+            "updated_at", "list_order", "service_slugs", "locale_used",
+            "title", "summary", "preview_images",
         }
         assert set(items[0].keys()) == expected_keys
         assert items[0]["preview_images"] == []
@@ -103,6 +104,223 @@ class TestPublicAvailable:
         )
         res = client.get("/api/menus/public/available?locale=es-ES&date=2025-10-15")
         assert res.json["items"] == []
+
+    def test_lists_menu_even_when_requested_locale_not_published(self, client, db):
+        """El menú (solo publicado en es-ES) debe salir aunque se pida en-GB,
+        cayendo al idioma por defecto disponible."""
+        seed_menu(
+            db,
+            name="Solo español",
+            availability={
+                "timezone": "Europe/Madrid",
+                "days_of_week": ["SAT"],
+                "date_ranges": [{"start": "2025-09-01", "end": "2025-12-31"}],
+            },
+        )
+        res = client.get("/api/menus/public/available?locale=en-GB&date=2025-09-27")
+        assert res.status_code == 200
+        items = res.json["items"]
+        assert len(items) == 1
+        assert items[0]["locale_used"] == "es-ES"
+        assert items[0]["title"] == "Título ES"
+        assert items[0]["summary"] == "Resumen ES"
+
+    def test_uses_requested_locale_when_published(self, client, db):
+        """Si el idioma pedido sí está publicado, se usa ese (no el default)."""
+        seed_menu(
+            db,
+            name="Bilingüe",
+            locales={
+                "es-ES": {"data": {}, "meta": {"title": "Título ES", "summary": "Resumen ES"}},
+                "en-GB": {"data": {}, "meta": {"title": "Title EN", "summary": "Summary EN"}},
+            },
+            publish={
+                "es-ES": {"status": "published"},
+                "en-GB": {"status": "published"},
+            },
+            availability={
+                "timezone": "Europe/Madrid",
+                "days_of_week": ["SAT"],
+                "date_ranges": [{"start": "2025-09-01", "end": "2025-12-31"}],
+            },
+        )
+        res = client.get("/api/menus/public/available?locale=en-GB&date=2025-09-27")
+        items = res.json["items"]
+        assert items[0]["locale_used"] == "en-GB"
+        assert items[0]["title"] == "Title EN"
+
+    def test_prefers_explicit_fallback_over_default(self, client, db):
+        """Con locale pedido ausente pero fallback publicado, usa el fallback."""
+        seed_menu(
+            db,
+            name="Con fallback",
+            locales={
+                "es-ES": {"data": {}, "meta": {"title": "Título ES", "summary": "Resumen ES"}},
+                "en-GB": {"data": {}, "meta": {"title": "Title EN", "summary": "Summary EN"}},
+            },
+            publish={
+                "es-ES": {"status": "published"},
+                "en-GB": {"status": "published"},
+            },
+            availability={
+                "timezone": "Europe/Madrid",
+                "days_of_week": ["SAT"],
+                "date_ranges": [{"start": "2025-09-01", "end": "2025-12-31"}],
+            },
+        )
+        res = client.get(
+            "/api/menus/public/available?locale=fr-FR&fallback=en-GB&date=2025-09-27"
+        )
+        items = res.json["items"]
+        assert items[0]["locale_used"] == "en-GB"
+        assert items[0]["title"] == "Title EN"
+
+    def test_items_come_ordered_by_list_order(self, client, db):
+        """El listado respeta `list_order` (menor primero) y deja los null al final."""
+        avail = {
+            "timezone": "Europe/Madrid",
+            "days_of_week": ["SAT"],
+            "date_ranges": [{"start": "2025-09-01", "end": "2025-12-31"}],
+        }
+        seed_menu(db, name="sin orden", list_order=None, availability=avail)
+        seed_menu(db, name="segundo", list_order=2, availability=avail)
+        seed_menu(db, name="primero", list_order=1, availability=avail)
+
+        res = client.get("/api/menus/public/available?locale=es-ES&date=2025-09-27")
+
+        assert res.status_code == 200
+        items = res.json["items"]
+        assert [i["name"] for i in items] == ["primero", "segundo", "sin orden"]
+        assert [i["list_order"] for i in items] == [1, 2, None]
+
+
+@pytest.mark.e2e
+class TestUpdateGeneralListOrder:
+    """
+    Tests de `PUT /api/menus/<id>/general` para el campo `list_order`.
+    """
+
+    def test_sets_list_order(self, client, db, auth_headers):
+        mid = str(seed_menu(db, name="Menú")["_id"])
+        res = client.put(
+            f"/api/menus/{mid}/general",
+            json={"list_order": 7},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 200
+        assert res.json["list_order"] == 7
+
+    def test_clears_list_order_with_null(self, client, db, auth_headers):
+        mid = str(seed_menu(db, name="Menú", list_order=3)["_id"])
+        res = client.put(
+            f"/api/menus/{mid}/general",
+            json={"list_order": None},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 200
+        assert res.json["list_order"] is None
+
+    def test_does_not_touch_list_order_when_absent(self, client, db, auth_headers):
+        """Actualizar solo `name` no debe borrar el orden ya asignado."""
+        mid = str(seed_menu(db, name="Menú", list_order=4)["_id"])
+        res = client.put(
+            f"/api/menus/{mid}/general",
+            json={"name": "Renombrado"},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 200
+        assert res.json["name"] == "Renombrado"
+        assert res.json["list_order"] == 4
+
+
+@pytest.mark.e2e
+class TestPublicServiceMenus:
+    """
+    Tests de `GET /api/menus/public/services/<slug>` y la exclusión en
+    `/public/available` de los menús clasificados.
+    """
+
+    _AVAIL = {
+        "timezone": "Europe/Madrid",
+        "days_of_week": ["SAT"],
+        "date_ranges": [{"start": "2025-09-01", "end": "2025-12-31"}],
+    }
+
+    def test_service_menus_returns_only_that_service(self, client, db):
+        seed_menu(db, name="desayuno", service_slugs=["desayunos"], availability=self._AVAIL)
+        seed_menu(db, name="normal", service_slugs=[], availability=self._AVAIL)
+
+        res = client.get("/api/menus/public/services/desayunos?locale=es-ES&date=2025-09-27")
+        assert res.status_code == 200
+        names = [i["name"] for i in res.json["items"]]
+        assert names == ["desayuno"]
+
+    def test_available_excludes_service_menus(self, client, db):
+        seed_menu(db, name="desayuno", service_slugs=["desayunos"], availability=self._AVAIL)
+        seed_menu(db, name="normal", service_slugs=[], availability=self._AVAIL)
+
+        res = client.get("/api/menus/public/available?locale=es-ES&date=2025-09-27")
+        names = [i["name"] for i in res.json["items"]]
+        assert names == ["normal"]
+
+    def test_service_menus_item_exposes_service_slugs(self, client, db):
+        seed_menu(db, name="desayuno", service_slugs=["desayunos"], availability=self._AVAIL)
+        res = client.get("/api/menus/public/services/desayunos?locale=es-ES&date=2025-09-27")
+        assert res.json["items"][0]["service_slugs"] == ["desayunos"]
+
+    def test_service_menus_empty_for_unknown_slug(self, client, db):
+        seed_menu(db, name="desayuno", service_slugs=["desayunos"], availability=self._AVAIL)
+        res = client.get("/api/menus/public/services/cena?locale=es-ES&date=2025-09-27")
+        assert res.json["items"] == []
+
+
+@pytest.mark.e2e
+class TestUpdateGeneralServiceSlugs:
+    """
+    Tests de `PUT /api/menus/<id>/general` para el campo `service_slugs`.
+    """
+
+    def test_sets_service_slugs(self, client, db, auth_headers):
+        seed_menu_service(db, slug="desayunos")
+        mid = str(seed_menu(db, name="Menú")["_id"])
+        res = client.put(
+            f"/api/menus/{mid}/general",
+            json={"service_slugs": ["desayunos"]},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 200
+        assert res.json["service_slugs"] == ["desayunos"]
+
+    def test_rejects_unknown_service_with_400(self, client, db, auth_headers):
+        mid = str(seed_menu(db, name="Menú")["_id"])
+        res = client.put(
+            f"/api/menus/{mid}/general",
+            json={"service_slugs": ["inexistente"]},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 400
+
+    def test_clears_service_slugs_with_empty_list(self, client, db, auth_headers):
+        seed_menu_service(db, slug="desayunos")
+        mid = str(seed_menu(db, name="Menú", service_slugs=["desayunos"])["_id"])
+        res = client.put(
+            f"/api/menus/{mid}/general",
+            json={"service_slugs": []},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 200
+        assert res.json["service_slugs"] == []
+
+    def test_does_not_touch_service_slugs_when_absent(self, client, db, auth_headers):
+        seed_menu_service(db, slug="desayunos")
+        mid = str(seed_menu(db, name="Menú", service_slugs=["desayunos"])["_id"])
+        res = client.put(
+            f"/api/menus/{mid}/general",
+            json={"name": "Renombrado"},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 200
+        assert res.json["service_slugs"] == ["desayunos"]
 
 
 @pytest.mark.e2e
@@ -234,6 +452,58 @@ class TestCreateMenu:
             headers=auth_headers(),
         )
         assert db["menus"].count_documents({"name": "Persistido"}) == 1
+
+
+@pytest.mark.e2e
+class TestDuplicateMenu:
+    """Tests de `POST /api/menus/<id>/duplicate`. Requiere `menus:create`."""
+
+    def test_returns_401_without_token(self, client, db):
+        menu = seed_menu(db)
+        res = client.post(f"/api/menus/{menu['_id']}/duplicate", json={})
+        assert res.status_code == 401
+
+    def test_returns_403_without_menus_create_permission(self, client, db, auth_headers):
+        menu = seed_menu(db)
+        res = client.post(
+            f"/api/menus/{menu['_id']}/duplicate",
+            json={},
+            headers=auth_headers(permissions=["menus:read"]),
+        )
+        assert res.status_code == 403
+
+    def test_returns_400_when_menu_id_is_invalid(self, client, auth_headers):
+        res = client.post(
+            "/api/menus/no-es-objectid/duplicate", json={}, headers=auth_headers()
+        )
+        assert res.status_code == 400
+
+    def test_returns_404_when_menu_not_found(self, client, auth_headers):
+        from bson import ObjectId
+        res = client.post(
+            f"/api/menus/{ObjectId()}/duplicate", json={}, headers=auth_headers()
+        )
+        assert res.status_code == 404
+
+    def test_duplicates_menu_and_returns_201(self, client, db, auth_headers):
+        menu = seed_menu(db, name="Original", status="published")
+        res = client.post(
+            f"/api/menus/{menu['_id']}/duplicate", json={}, headers=auth_headers()
+        )
+        assert res.status_code == 201
+        assert res.json["name"] == "Original (copia)"
+        assert res.json["status"] == "draft"
+        assert db["menus"].count_documents({}) == 2
+
+    def test_duplicates_with_custom_name(self, client, db, auth_headers):
+        menu = seed_menu(db, name="Original")
+        res = client.post(
+            f"/api/menus/{menu['_id']}/duplicate",
+            json={"name": "Mi copia"},
+            headers=auth_headers(),
+        )
+        assert res.status_code == 201
+        assert res.json["name"] == "Mi copia"
 
 
 @pytest.mark.e2e

@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aralar · Gestor de Menús</title>
+<style>
+  /* ============ RESET & TOKENS ============ */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f6f7f9;
+    --surface: #ffffff;
+    --surface-2: #fafbfc;
+    --border: #e4e7ec;
+    --border-strong: #d0d5dd;
+    --text: #1a212b;
+    --text-2: #56606e;
+    --text-3: #8a94a3;
+    --accent: #1f6f54;
+    --accent-soft: #e8f3ef;
+    --accent-hover: #185c45;
+    --warn: #b45309;
+    --warn-soft: #fef3e2;
+    --danger: #b42318;
+    --danger-soft: #fee4e2;
+    --info: #175cd3;
+    --info-soft: #eaf1fd;
+    --radius: 10px;
+    --radius-sm: 7px;
+    --shadow: 0 1px 3px rgba(16,24,40,.07), 0 1px 2px rgba(16,24,40,.04);
+    --shadow-lg: 0 8px 24px rgba(16,24,40,.10);
+    font-size: 15px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ============ TOPBAR ============ */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 36px;
+    height: 58px;
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; }
+  .brand-logo {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--accent); color: #fff;
+    display: grid; place-items: center; font-size: .95rem;
+  }
+  .brand small { color: var(--text-3); font-weight: 500; font-size: .78rem; display: block; }
+
+  .nav-tabs { display: flex; gap: 4px; height: 100%; }
+  .nav-tab {
+    display: flex; align-items: center; gap: 7px;
+    padding: 0 18px; border: none; background: none; cursor: pointer;
+    font-size: .92rem; font-weight: 600; color: var(--text-2);
+    border-bottom: 2.5px solid transparent; height: 100%;
+    transition: color .15s;
+  }
+  .nav-tab:hover { color: var(--text); }
+  .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    display: grid; place-items: center; font-weight: 700; font-size: .8rem;
+  }
+
+  /* ============ LAYOUT ============ */
+  .view { display: none; }
+  .view.active { display: block; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 28px; }
+  .container-wide { max-width: 1400px; margin: 0 auto; padding: 24px 28px; }
+
+  .page-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+  .page-head h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; }
+  .page-head p { color: var(--text-2); margin-top: 5px; font-size: .93rem; max-width: 560px; line-height: 1.5; }
+
+  /* ============ BUTTONS ============ */
+  .btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 9px 16px; border-radius: var(--radius-sm);
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+    border: 1px solid transparent; transition: all .15s;
+    white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border-strong); }
+  .btn-secondary:hover { background: var(--surface-2); border-color: var(--text-3); }
+  .btn-ghost { background: none; color: var(--text-2); }
+  .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
+  .btn-sm { padding: 6px 12px; font-size: .83rem; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ============ BADGES & CHIPS ============ */
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 10px; border-radius: 99px;
+    font-size: .75rem; font-weight: 600;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge.active { background: var(--accent-soft); color: var(--accent); }
+  .badge.draft { background: var(--warn-soft); color: var(--warn); }
+  .badge.neutral { background: #eef1f4; color: var(--text-2); }
+  .badge.info { background: var(--info-soft); color: var(--info); }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 11px; border-radius: 99px;
+    background: var(--surface-2); border: 1px solid var(--border);
+    font-size: .78rem; font-weight: 500; color: var(--text-2);
+  }
+
+  /* ============ CARDS GRID (list screens) ============ */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 18px; }
+
+  .struct-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 20px; cursor: pointer; transition: all .18s;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .struct-card:hover { border-color: var(--accent); box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+  .struct-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+  .struct-card h3 { font-size: 1.02rem; font-weight: 700; }
+  .struct-card .desc { color: var(--text-2); font-size: .85rem; line-height: 1.45; }
+
+  /* mini diagrama de secciones dentro de la card */
+  .mini-diagram { display: flex; flex-direction: column; gap: 5px; background: var(--surface-2); border: 1px dashed var(--border-strong); border-radius: var(--radius-sm); padding: 12px; }
+  .mini-sec { display: flex; align-items: center; gap: 8px; font-size: .76rem; color: var(--text-2); }
+  .mini-sec .bar { height: 20px; border-radius: 5px; background: #e6ebf0; flex: 1; display: flex; align-items: center; padding: 0 9px; font-weight: 600; gap: 6px; }
+  .mini-sec .bar.hero { background: linear-gradient(90deg, var(--accent-soft), #d8ece4); color: var(--accent); }
+  .mini-sec .bar.repeat { background: var(--info-soft); color: var(--info); }
+  .mini-sec .rep-tag { font-size: .68rem; font-weight: 700; opacity: .75; margin-left: auto; }
+
+  .struct-card-foot { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 4px; }
+  .struct-card-foot .meta { font-size: .76rem; color: var(--text-3); margin-left: auto; }
+
+  /* card "crear nueva" */
+  .new-card {
+    border: 2px dashed var(--border-strong); border-radius: var(--radius);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 10px; padding: 32px; min-height: 240px; cursor: pointer;
+    color: var(--text-3); font-weight: 600; transition: all .18s; background: none;
+    font-size: .95rem;
+  }
+  .new-card:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .new-card .plus { font-size: 2rem; font-weight: 300; line-height: 1; }
+
+  /* ============ HELP CALLOUT ============ */
+  .callout {
+    display: flex; gap: 12px; background: var(--info-soft);
+    border: 1px solid #cadcf8; border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 24px; font-size: .88rem;
+    color: #143a72; line-height: 1.5;
+  }
+  .callout .ico { flex-shrink: 0; font-size: 1.1rem; }
+  .callout b { font-weight: 700; }
+  .callout .close { margin-left: auto; background: none; border: none; cursor: pointer; color: #143a72; opacity: .5; font-size: 1rem; align-self: flex-start; }
+  .callout .close:hover { opacity: 1; }
+</style>
+<style id="builder-styles">
+  /* ============ BUILDER: barra superior ============ */
+  .builder-bar {
+    background: var(--surface); border-bottom: 1px solid var(--border);
+    padding: 12px 28px; display: flex; align-items: center; gap: 16px;
+    position: sticky; top: 58px; z-index: 40;
+  }
+  .builder-bar .back { background:none; border:none; cursor:pointer; color:var(--text-2); font-size:.9rem; font-weight:600; display:flex; align-items:center; gap:5px; }
+  .builder-bar .back:hover { color: var(--text); }
+  .builder-name-input {
+    border: 1px solid transparent; border-radius: var(--radius-sm);
+    font-size: 1.05rem; font-weight: 700; padding: 6px 10px; width: 320px;
+    background: none; color: var(--text);
+  }
+  .builder-name-input:hover, .builder-name-input:focus { border-color: var(--border-strong); background: var(--surface); outline: none; }
+  .builder-bar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+
+  /* Pasos guía */
+  .steps { display: flex; align-items: center; gap: 0; }
+  .step { display: flex; align-items: center; gap: 7px; font-size: .8rem; font-weight: 600; color: var(--text-3); padding: 0 12px; }
+  .step .n { width: 20px; height: 20px; border-radius: 50%; background: #e7ebef; display: grid; place-items: center; font-size: .7rem; }
+  .step.done { color: var(--accent); }
+  .step.done .n { background: var(--accent); color: #fff; }
+  .step.current { color: var(--text); }
+  .step.current .n { background: var(--text); color: #fff; }
+  .step-sep { width: 22px; height: 1px; background: var(--border-strong); }
+
+  /* ============ BUILDER: layout 3 columnas ============ */
+  .builder-layout {
+    display: grid; grid-template-columns: 250px 1fr 380px;
+    gap: 20px; align-items: start;
+  }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+  }
+  .panel-head { padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .panel-head h4 { font-size: .85rem; font-weight: 700; }
+  .panel-head p { font-size: .76rem; color: var(--text-3); margin-top: 3px; line-height: 1.4; }
+  .panel-body { padding: 14px; }
+
+  /* Paleta de bloques */
+  .block-item {
+    display: flex; gap: 11px; padding: 12px; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); cursor: pointer; margin-bottom: 9px;
+    transition: all .15s; background: var(--surface);
+  }
+  .block-item:hover { border-color: var(--accent); background: var(--accent-soft); }
+  .block-item .b-ico { font-size: 1.25rem; }
+  .block-item .b-name { font-size: .85rem; font-weight: 700; }
+  .block-item .b-desc { font-size: .73rem; color: var(--text-3); line-height: 1.35; margin-top: 2px; }
+  .block-item .b-add { margin-left: auto; align-self: center; color: var(--text-3); font-weight: 700; }
+
+  /* Canvas central */
+  .canvas-sec {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow);
+    margin-bottom: 14px; overflow: hidden;
+  }
+  .canvas-sec-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 13px 16px; background: var(--surface-2);
+    border-bottom: 1px solid var(--border); cursor: pointer;
+  }
+  .canvas-sec-head .drag { color: var(--text-3); cursor: grab; font-size: .95rem; }
+  .canvas-sec-head .sec-title { font-weight: 700; font-size: .93rem; display: flex; align-items: center; gap: 8px; }
+  .canvas-sec-head .sec-actions { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+  .icon-btn { background: none; border: none; cursor: pointer; color: var(--text-3); font-size: .95rem; padding: 4px 6px; border-radius: 5px; }
+  .icon-btn:hover { background: #edf0f3; color: var(--text); }
+
+  .canvas-sec-body { padding: 8px 16px 14px; }
+
+  /* Fila de campo */
+  .field-row {
+    display: grid; grid-template-columns: 1fr 130px auto auto auto;
+    align-items: center; gap: 12px;
+    padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); margin-top: 8px; background: var(--surface);
+  }
+  .field-row .f-name { font-size: .88rem; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .field-row .f-name .f-ico { opacity: .75; }
+  .field-row select.f-type {
+    border: 1px solid var(--border); border-radius: 6px; padding: 5px 8px;
+    font-size: .8rem; color: var(--text-2); background: var(--surface-2); cursor: pointer;
+  }
+
+  /* Toggle traducible */
+  .tog { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: .75rem; font-weight: 600; color: var(--text-3); user-select: none; white-space: nowrap; }
+  .tog .tr { width: 32px; height: 18px; border-radius: 99px; background: #d7dce3; position: relative; transition: background .15s; }
+  .tog .tr::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+  .tog.on { color: var(--accent); }
+  .tog.on .tr { background: var(--accent); }
+  .tog.on .tr::after { left: 16px; }
+
+  .req-pill { font-size: .7rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; cursor: pointer; border: 1px solid var(--border); color: var(--text-3); background: none; }
+  .req-pill.on { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
+
+  .add-field-btn {
+    margin-top: 10px; width: 100%; padding: 9px; border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius-sm); background: none; cursor: pointer;
+    font-size: .82rem; font-weight: 600; color: var(--text-3); transition: all .15s;
+  }
+  .add-field-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  /* repeatable config strip */
+  .rep-strip {
+    display: flex; align-items: center; gap: 10px; margin-top: 12px;
+    padding: 9px 12px; background: var(--info-soft); border-radius: var(--radius-sm);
+    font-size: .78rem; color: var(--info); font-weight: 600;
+  }
+  .rep-strip input { width: 46px; border: 1px solid #b9cff2; border-radius: 5px; padding: 3px 6px; font-size: .8rem; text-align: center; }
+
+  .canvas-empty {
+    border: 2px dashed var(--border-strong); border-radius: var(--radius);
+    padding: 48px 24px; text-align: center; color: var(--text-3); font-size: .9rem; line-height: 1.6;
+  }
+
+  /* Preview derecha */
+  .preview-panel { position: sticky; top: 128px; }
+  .preview-frame {
+    background: #fff; border-radius: var(--radius-sm); overflow: hidden;
+    border: 1px solid var(--border); margin: 14px; box-shadow: 0 2px 10px rgba(16,24,40,.06);
+  }
+  .pv-hero { background: linear-gradient(135deg, #1f6f54, #2d8a6b); color: #fff; padding: 22px 20px; text-align: center; }
+  .pv-hero .pv-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -.01em; }
+  .pv-hero .pv-date { font-size: .75rem; opacity: .85; margin-top: 4px; }
+  .pv-section { padding: 14px 18px; }
+  .pv-section h5 { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-3); margin-bottom: 9px; }
+  .pv-dish { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px dashed var(--border); font-size: .85rem; }
+  .pv-dish:last-child { border-bottom: none; }
+  .pv-dish .pv-price { font-weight: 700; color: var(--accent); font-size: .82rem; }
+  .pv-dish .pv-name { display: flex; align-items: center; gap: 6px; }
+  .pv-allergen { font-size: .65rem; opacity: .8; }
+  .pv-foot { padding: 11px 18px; background: var(--surface-2); border-top: 1px solid var(--border); font-size: .7rem; color: var(--text-3); text-align: center; }
+  .pv-note { padding: 10px 14px 14px; text-align: center; font-size: .73rem; color: var(--text-3); }
+
+  /* Traducible legend */
+  .legend {
+    display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+    background: var(--surface-2); border-radius: var(--radius-sm);
+    margin: 0 14px 14px; font-size: .76rem; color: var(--text-2); line-height: 1.45;
+  }
+  .legend b { color: var(--text); }
+</style>
+<style id="menus-styles">
+  /* ============ MENÚS: galería ============ */
+  .menu-status-row { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
+  .filter-chip {
+    padding: 6px 14px; border-radius: 99px; border: 1px solid var(--border-strong);
+    background: var(--surface); cursor: pointer; font-size: .84rem; font-weight: 600; color: var(--text-2);
+  }
+  .filter-chip.on { background: var(--text); color: #fff; border-color: var(--text); }
+
+  .menu-row {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 16px 20px; margin-bottom: 12px;
+    display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 18px;
+    cursor: pointer; transition: all .15s;
+  }
+  .menu-row:hover { border-color: var(--accent); }
+  .menu-row .m-name { font-weight: 700; font-size: .97rem; }
+  .menu-row .m-sub { font-size: .78rem; color: var(--text-3); margin-top: 3px; }
+  .lang-flags { display: flex; gap: 6px; }
+  .lang-flag { font-size: .74rem; font-weight: 700; padding: 3px 8px; border-radius: 5px; }
+  .lang-flag.pub { background: var(--accent-soft); color: var(--accent); }
+  .lang-flag.pending { background: #eef1f4; color: var(--text-3); }
+  .m-days { font-size: .78rem; color: var(--text-2); }
+
+  /* Selector de estructura (modal-like section) */
+  .choose-title { font-size: 1.05rem; font-weight: 700; margin: 28px 0 14px; }
+
+  /* ============ MENÚS: editor ============ */
+  .editor-layout { display: grid; grid-template-columns: 1fr 330px; gap: 22px; align-items: start; }
+
+  /* Tabs de idioma */
+  .lang-tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 18px; }
+  .lang-tab {
+    padding: 10px 20px; border: none; background: none; cursor: pointer;
+    font-size: .92rem; font-weight: 700; color: var(--text-3);
+    border-bottom: 2.5px solid transparent; margin-bottom: -2px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .lang-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .lang-tab .lt-status { font-size: .68rem; padding: 2px 7px; border-radius: 99px; font-weight: 700; }
+  .lang-tab .lt-status.ok { background: var(--accent-soft); color: var(--accent); }
+  .lang-tab .lt-status.todo { background: var(--warn-soft); color: var(--warn); }
+  .lang-tab .add-lang { color: var(--text-3); font-weight: 500; }
+
+  /* Sección de formulario */
+  .form-sec {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden;
+  }
+  .form-sec-head { padding: 13px 18px; background: var(--surface-2); border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .form-sec-head h4 { font-size: .93rem; font-weight: 700; }
+  .form-sec-head .fs-count { font-size: .76rem; color: var(--text-3); margin-left: auto; }
+  .form-sec-body { padding: 16px 18px; }
+
+  .form-field { margin-bottom: 14px; }
+  .form-field label { display: flex; align-items: center; gap: 7px; font-size: .8rem; font-weight: 700; color: var(--text-2); margin-bottom: 6px; }
+  .form-field label .lang-mark { font-size: .68rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 2px 7px; border-radius: 99px; }
+  .form-field label .lock-mark { font-size: .68rem; font-weight: 700; color: var(--text-3); background: #eef1f4; padding: 2px 7px; border-radius: 99px; }
+  .form-field input[type=text], .form-field input[type=date], .form-field input[type=number], .form-field textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm); font-size: .9rem; font-family: inherit; color: var(--text);
+    transition: border-color .15s;
+  }
+  .form-field input:focus, .form-field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .form-field input:disabled { background: var(--surface-2); color: var(--text-3); cursor: not-allowed; }
+  .form-field .f-hint { font-size: .73rem; color: var(--text-3); margin-top: 5px; }
+
+  /* Card de plato unificada */
+  .dish-card {
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 14px 16px; margin-bottom: 12px; background: var(--surface);
+    display: grid; grid-template-columns: 64px 1fr; gap: 14px;
+  }
+  .dish-photo {
+    width: 64px; height: 64px; border-radius: 8px; background: var(--surface-2);
+    border: 1.5px dashed var(--border-strong); display: grid; place-items: center;
+    font-size: 1.3rem; cursor: pointer; color: var(--text-3);
+  }
+  .dish-photo:hover { border-color: var(--accent); color: var(--accent); }
+  .dish-photo.has { border-style: solid; font-size: 1.7rem; background: #fdf2e3; }
+  .dish-fields { display: grid; grid-template-columns: 1fr 110px; gap: 10px 14px; }
+  .dish-fields .full { grid-column: 1 / -1; }
+  .dish-head-row { display: flex; align-items: center; justify-content: space-between; grid-column: 1 / -1; }
+  .dish-head-row .d-num { font-size: .74rem; font-weight: 800; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+
+  /* Alérgenos selector */
+  .allergen-row { display: flex; gap: 6px; flex-wrap: wrap; grid-column: 1 / -1; }
+  .allergen-chip {
+    display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px;
+    border: 1px solid var(--border); border-radius: 99px; background: var(--surface);
+    font-size: .75rem; cursor: pointer; user-select: none; color: var(--text-2); font-weight: 600;
+  }
+  .allergen-chip.on { background: var(--warn-soft); border-color: #ecc994; color: var(--warn); }
+
+  .add-dish-btn {
+    width: 100%; padding: 12px; border: 1.5px dashed var(--border-strong);
+    border-radius: var(--radius-sm); background: none; cursor: pointer;
+    font-size: .88rem; font-weight: 700; color: var(--text-3); transition: all .15s;
+  }
+  .add-dish-btn:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+
+  /* Disponibilidad */
+  .day-chips { display: flex; gap: 7px; }
+  .day-chip {
+    width: 42px; height: 42px; border-radius: 9px; border: 1px solid var(--border-strong);
+    background: var(--surface); font-weight: 700; font-size: .82rem; cursor: pointer;
+    color: var(--text-3); transition: all .12s;
+  }
+  .day-chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .date-range-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .date-range-row input { padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-size: .85rem; font-family: inherit; }
+
+  /* Panel lateral: publicación */
+  .pub-panel { position: sticky; top: 128px; }
+  .check-item { display: flex; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--border); align-items: flex-start; }
+  .check-item:last-child { border-bottom: none; }
+  .check-ico { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: .7rem; flex-shrink: 0; font-weight: 800; }
+  .check-ico.ok { background: var(--accent-soft); color: var(--accent); }
+  .check-ico.todo { background: #eef1f4; color: var(--text-3); border: 1.5px dashed var(--border-strong); }
+  .check-item .c-title { font-size: .85rem; font-weight: 700; }
+  .check-item .c-sub { font-size: .75rem; color: var(--text-3); margin-top: 2px; line-height: 1.4; }
+  .pub-footer { padding: 14px; border-top: 1px solid var(--border); }
+  .pub-footer .btn { width: 100%; justify-content: center; }
+  .pub-footer .pub-note { font-size: .74rem; color: var(--text-3); text-align: center; margin-top: 9px; line-height: 1.4; }
+</style>
+</head>
+<body>
+
+<!-- ==================== TOPBAR ==================== -->
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-logo">A</div>
+    <div>Aralar<small>Gestor de Menús</small></div>
+  </div>
+  <nav class="nav-tabs">
+    <button class="nav-tab active" data-view="estructuras" onclick="switchView('estructuras')">🧩 Estructuras</button>
+    <button class="nav-tab" data-view="menus" onclick="switchView('menus')">🍽️ Menús</button>
+  </nav>
+  <div class="topbar-right">
+    <span class="badge neutral">Prototipo v1</span>
+    <div class="avatar">MA</div>
+  </div>
+</header>
+
+<!-- ==================== VISTA: ESTRUCTURAS ==================== -->
+<div class="view active" id="view-estructuras">
+
+  <!-- ---- Pantalla: lista de estructuras ---- -->
+  <div class="screen active" id="e-list">
+    <div class="container">
+
+      <div class="callout" id="e-callout">
+        <span class="ico">💡</span>
+        <div>
+          <b>¿Qué es una estructura?</b> Es la plantilla de tu menú: define qué secciones tiene (cabecera, platos, postres…) y qué datos lleva cada plato (nombre, precio, foto, alérgenos…). Se crea <b>una vez</b> y luego la reutilizas para crear todos los menús que quieras.
+        </div>
+        <button class="close" onclick="this.parentElement.style.display='none'">✕</button>
+      </div>
+
+      <div class="page-head">
+        <div>
+          <h1>Estructuras de menú</h1>
+          <p>Diseña la forma de tus menús. Una estructura activa puede usarse para crear menús nuevos.</p>
+        </div>
+        <button class="btn btn-primary" onclick="openBuilder()">＋ Nueva estructura</button>
+      </div>
+
+      <div class="cards-grid">
+
+        <!-- Card: daily-basic -->
+        <div class="struct-card" onclick="openBuilder('daily')">
+          <div class="struct-card-top">
+            <h3>Menú del día básico</h3>
+            <span class="badge active"><span class="badge-dot"></span>Activa</span>
+          </div>
+          <div class="desc">Cabecera con título y fecha, y una lista de hasta 5 platos con precio.</div>
+          <div class="mini-diagram">
+            <div class="mini-sec"><div class="bar hero">📰 Cabecera</div></div>
+            <div class="mini-sec"><div class="bar repeat">🍽️ Platos <span class="rep-tag">×1–5</span></div></div>
+            <div class="mini-sec"><div class="bar">📄 Pie</div></div>
+          </div>
+          <div class="struct-card-foot">
+            <span class="chip">🌐 ES · EN</span>
+            <span class="chip">💶 Precios</span>
+            <span class="meta">12 menús creados</span>
+          </div>
+        </div>
+
+        <!-- Card: simple-photo -->
+        <div class="struct-card" onclick="openBuilder('photo')">
+          <div class="struct-card-top">
+            <h3>Menú con fotos</h3>
+            <span class="badge active"><span class="badge-dot"></span>Activa</span>
+          </div>
+          <div class="desc">Banner de portada y platos con fotografía destacada. Ideal para carta visual.</div>
+          <div class="mini-diagram">
+            <div class="mini-sec"><div class="bar hero">🖼️ Portada con banner</div></div>
+            <div class="mini-sec"><div class="bar repeat">📷 Platos con foto <span class="rep-tag">×1–8</span></div></div>
+          </div>
+          <div class="struct-card-foot">
+            <span class="chip">🌐 ES · EN</span>
+            <span class="chip">📷 Imágenes</span>
+            <span class="meta">5 menús creados</span>
+          </div>
+        </div>
+
+        <!-- Card: seasonal -->
+        <div class="struct-card" onclick="openBuilder('seasonal')">
+          <div class="struct-card-top">
+            <h3>Carta de temporada</h3>
+            <span class="badge active"><span class="badge-dot"></span>Activa</span>
+          </div>
+          <div class="desc">Carta completa: entrantes, principales, postres y vinos. Con precios y alérgenos.</div>
+          <div class="mini-diagram">
+            <div class="mini-sec"><div class="bar hero">📰 Cabecera</div></div>
+            <div class="mini-sec"><div class="bar repeat">🥗 Entrantes <span class="rep-tag">×n</span></div></div>
+            <div class="mini-sec"><div class="bar repeat">🍖 Principales <span class="rep-tag">×n</span></div></div>
+            <div class="mini-sec"><div class="bar repeat">🍰 Postres <span class="rep-tag">×n</span></div></div>
+            <div class="mini-sec"><div class="bar repeat">🍷 Vinos <span class="rep-tag">×n</span></div></div>
+          </div>
+          <div class="struct-card-foot">
+            <span class="chip">🌐 ES · EN</span>
+            <span class="chip">⚠️ Alérgenos</span>
+            <span class="meta">3 menús creados</span>
+          </div>
+        </div>
+
+        <!-- Card: allergens (draft) -->
+        <div class="struct-card" onclick="openBuilder('allergens')">
+          <div class="struct-card-top">
+            <h3>Menú con alérgenos detallados</h3>
+            <span class="badge draft"><span class="badge-dot"></span>Borrador</span>
+          </div>
+          <div class="desc">Menú completo con iconografía de los 14 alérgenos oficiales por plato.</div>
+          <div class="mini-diagram">
+            <div class="mini-sec"><div class="bar hero">📰 Cabecera</div></div>
+            <div class="mini-sec"><div class="bar repeat">🥗 Entrantes <span class="rep-tag">×n</span></div></div>
+            <div class="mini-sec"><div class="bar repeat">🍖 Principales <span class="rep-tag">×n</span></div></div>
+            <div class="mini-sec"><div class="bar">📄 Pie legal</div></div>
+          </div>
+          <div class="struct-card-foot">
+            <span class="chip">🌐 ES · EN</span>
+            <span class="chip">⚠️ Alérgenos</span>
+            <span class="meta">Sin menús aún</span>
+          </div>
+        </div>
+
+        <!-- Card: crear nueva -->
+        <button class="new-card" onclick="openBuilder()">
+          <span class="plus">＋</span>
+          Crear nueva estructura
+          <span style="font-weight:400;font-size:.8rem;color:var(--text-3)">Diseña desde cero o parte de un ejemplo</span>
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- Pantalla: builder ---- -->
+  <div class="screen" id="e-builder">
+
+    <div class="builder-bar">
+      <button class="back" onclick="backToList()">← Volver</button>
+      <input class="builder-name-input" value="Menú del día básico" placeholder="Nombre de tu estructura…">
+      <span class="badge draft"><span class="badge-dot"></span>Borrador</span>
+      <div class="steps">
+        <div class="step done"><span class="n">✓</span>Nombre</div>
+        <div class="step-sep"></div>
+        <div class="step current"><span class="n">2</span>Secciones</div>
+        <div class="step-sep"></div>
+        <div class="step"><span class="n">3</span>Revisar</div>
+        <div class="step-sep"></div>
+        <div class="step"><span class="n">4</span>Activar</div>
+      </div>
+      <div class="builder-bar-right">
+        <button class="btn btn-secondary btn-sm">Guardar borrador</button>
+        <button class="btn btn-primary btn-sm" onclick="alert('Al activar, la estructura queda congelada y disponible para crear menús.\n\n(Simulación de prototipo)')">✓ Activar estructura</button>
+      </div>
+    </div>
+
+    <div class="container-wide">
+      <div class="builder-layout">
+
+        <!-- Columna 1: Paleta de bloques -->
+        <aside class="panel">
+          <div class="panel-head">
+            <h4>Añadir secciones</h4>
+            <p>Haz clic para agregar una sección a tu estructura.</p>
+          </div>
+          <div class="panel-body">
+            <div class="block-item" onclick="alert('(Simulación) La sección Cabecera se agregaría al canvas')">
+              <span class="b-ico">📰</span>
+              <div><div class="b-name">Cabecera</div><div class="b-desc">Título y fecha del menú. Aparece arriba.</div></div>
+              <span class="b-add">＋</span>
+            </div>
+            <div class="block-item" onclick="alert('(Simulación) La sección Lista de platos se agregaría al canvas')">
+              <span class="b-ico">🍽️</span>
+              <div><div class="b-name">Lista de platos</div><div class="b-desc">Platos que se repiten: nombre, precio, foto…</div></div>
+              <span class="b-add">＋</span>
+            </div>
+            <div class="block-item" onclick="alert('(Simulación) La sección Texto libre se agregaría al canvas')">
+              <span class="b-ico">📝</span>
+              <div><div class="b-name">Texto libre</div><div class="b-desc">Un párrafo: notas, condiciones, descripción…</div></div>
+              <span class="b-add">＋</span>
+            </div>
+            <div class="block-item" onclick="alert('(Simulación) La sección Pie de menú se agregaría al canvas')">
+              <span class="b-ico">📄</span>
+              <div><div class="b-name">Pie de menú</div><div class="b-desc">Texto final: IVA, pan incluido, avisos…</div></div>
+              <span class="b-add">＋</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Columna 2: Canvas -->
+        <main>
+
+          <!-- Sección: Cabecera -->
+          <div class="canvas-sec">
+            <div class="canvas-sec-head">
+              <span class="drag">⠿</span>
+              <span class="sec-title">📰 Cabecera</span>
+              <span class="badge neutral">única</span>
+              <div class="sec-actions">
+                <button class="icon-btn" title="Duplicar">⧉</button>
+                <button class="icon-btn" title="Eliminar">🗑</button>
+                <button class="icon-btn" title="Plegar">▾</button>
+              </div>
+            </div>
+            <div class="canvas-sec-body">
+
+              <div class="field-row">
+                <span class="f-name"><span class="f-ico">🔤</span>Título del menú</span>
+                <select class="f-type"><option selected>Texto corto</option><option>Texto largo</option><option>Fecha</option><option>Precio</option><option>Foto</option><option>Alérgenos</option></select>
+                <button class="req-pill on" onclick="this.classList.toggle('on')">Obligatorio</button>
+                <label class="tog on" onclick="this.classList.toggle('on')"><span class="tr"></span>🌐 Se traduce</label>
+                <button class="icon-btn" title="Eliminar campo">✕</button>
+              </div>
+
+              <div class="field-row">
+                <span class="f-name"><span class="f-ico">📅</span>Fecha</span>
+                <select class="f-type"><option>Texto corto</option><option>Texto largo</option><option selected>Fecha</option><option>Precio</option><option>Foto</option><option>Alérgenos</option></select>
+                <button class="req-pill on" onclick="this.classList.toggle('on')">Obligatorio</button>
+                <label class="tog" onclick="this.classList.toggle('on')"><span class="tr"></span>🔒 Igual en todos</label>
+                <button class="icon-btn" title="Eliminar campo">✕</button>
+              </div>
+
+              <button class="add-field-btn">＋ Añadir campo a esta sección</button>
+            </div>
+          </div>
+
+          <!-- Sección: Platos -->
+          <div class="canvas-sec">
+            <div class="canvas-sec-head">
+              <span class="drag">⠿</span>
+              <span class="sec-title">🍽️ Platos</span>
+              <span class="badge info">se repite</span>
+              <div class="sec-actions">
+                <button class="icon-btn" title="Duplicar">⧉</button>
+                <button class="icon-btn" title="Eliminar">🗑</button>
+                <button class="icon-btn" title="Plegar">▾</button>
+              </div>
+            </div>
+            <div class="canvas-sec-body">
+
+              <div class="field-row">
+                <span class="f-name"><span class="f-ico">🔤</span>Nombre del plato</span>
+                <select class="f-type"><option selected>Texto corto</option><option>Texto largo</option><option>Fecha</option><option>Precio</option><option>Foto</option><option>Alérgenos</option></select>
+                <button class="req-pill on" onclick="this.classList.toggle('on')">Obligatorio</button>
+                <label class="tog on" onclick="this.classList.toggle('on')"><span class="tr"></span>🌐 Se traduce</label>
+                <button class="icon-btn" title="Eliminar campo">✕</button>
+              </div>
+
+              <div class="field-row">
+                <span class="f-name"><span class="f-ico">💶</span>Precio</span>
+                <select class="f-type"><option>Texto corto</option><option>Texto largo</option><option>Fecha</option><option selected>Precio</option><option>Foto</option><option>Alérgenos</option></select>
+                <button class="req-pill on" onclick="this.classList.toggle('on')">Obligatorio</button>
+                <label class="tog" onclick="this.classList.toggle('on')"><span class="tr"></span>🔒 Igual en todos</label>
+                <button class="icon-btn" title="Eliminar campo">✕</button>
+              </div>
+
+              <div class="field-row">
+                <span class="f-name"><span class="f-ico">⚠️</span>Alérgenos</span>
+                <select class="f-type"><option>Texto corto</option><option>Texto largo</option><option>Fecha</option><option>Precio</option><option>Foto</option><option selected>Alérgenos</option></select>
+                <button class="req-pill" onclick="this.classList.toggle('on')">Obligatorio</button>
+                <label class="tog" onclick="this.classList.toggle('on')"><span class="tr"></span>🔒 Igual en todos</label>
+                <button class="icon-btn" title="Eliminar campo">✕</button>
+              </div>
+
+              <button class="add-field-btn">＋ Añadir campo a esta sección</button>
+
+              <div class="rep-strip">
+                🔁 Los platos se repiten &nbsp;·&nbsp; Mínimo <input type="number" value="1"> Máximo <input type="number" value="5"> platos por menú
+              </div>
+            </div>
+          </div>
+
+          <!-- Sección: Pie -->
+          <div class="canvas-sec">
+            <div class="canvas-sec-head">
+              <span class="drag">⠿</span>
+              <span class="sec-title">📄 Pie de menú</span>
+              <span class="badge neutral">única</span>
+              <div class="sec-actions">
+                <button class="icon-btn" title="Duplicar">⧉</button>
+                <button class="icon-btn" title="Eliminar">🗑</button>
+                <button class="icon-btn" title="Plegar">▾</button>
+              </div>
+            </div>
+            <div class="canvas-sec-body">
+              <div class="field-row">
+                <span class="f-name"><span class="f-ico">📝</span>Nota final</span>
+                <select class="f-type"><option>Texto corto</option><option selected>Texto largo</option><option>Fecha</option><option>Precio</option><option>Foto</option><option>Alérgenos</option></select>
+                <button class="req-pill" onclick="this.classList.toggle('on')">Obligatorio</button>
+                <label class="tog on" onclick="this.classList.toggle('on')"><span class="tr"></span>🌐 Se traduce</label>
+                <button class="icon-btn" title="Eliminar campo">✕</button>
+              </div>
+              <button class="add-field-btn">＋ Añadir campo a esta sección</button>
+            </div>
+          </div>
+
+        </main>
+
+        <!-- Columna 3: Preview -->
+        <aside class="panel preview-panel">
+          <div class="panel-head">
+            <h4>👁️ Así se verá un menú con esta estructura</h4>
+            <p>Ejemplo con datos de muestra. El contenido real se rellena al crear cada menú.</p>
+          </div>
+
+          <div class="preview-frame">
+            <div class="pv-hero">
+              <div class="pv-title">Menú del día</div>
+              <div class="pv-date">viernes, 5 de septiembre</div>
+            </div>
+            <div class="pv-section">
+              <h5>Platos</h5>
+              <div class="pv-dish"><span class="pv-name">Gazpacho <span class="pv-allergen">🥛</span></span><span class="pv-price">5,50 €</span></div>
+              <div class="pv-dish"><span class="pv-name">Tortilla de patatas <span class="pv-allergen">🥚</span></span><span class="pv-price">4,20 €</span></div>
+              <div class="pv-dish"><span class="pv-name">Ensalada mixta</span><span class="pv-price">4,80 €</span></div>
+            </div>
+            <div class="pv-foot">Pan e IVA incluidos · Bebida no incluida</div>
+          </div>
+
+          <div class="legend">
+            <div><b>🌐 Se traduce</b> — se escribirá una vez por cada idioma (español, inglés…).</div>
+            <div><b>🔒 Igual en todos</b> — se escribe una sola vez y vale para todos los idiomas (precios, fechas, fotos).</div>
+          </div>
+
+          <div class="pv-note">La vista previa se actualiza al modificar las secciones</div>
+        </aside>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ==================== VISTA: MENÚS ==================== -->
+<div class="view" id="view-menus">
+
+  <!-- ---- Pantalla: galería / lista de menús ---- -->
+  <div class="screen active" id="m-gallery">
+    <div class="container">
+
+      <div class="page-head">
+        <div>
+          <h1>Menús</h1>
+          <p>Crea menús a partir de tus estructuras, rellena los platos y publícalos en los idiomas que quieras.</p>
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('choose-struct').scrollIntoView({behavior:'smooth'})">＋ Nuevo menú</button>
+      </div>
+
+      <div class="menu-status-row">
+        <button class="filter-chip on">Todos</button>
+        <button class="filter-chip">Visibles ahora</button>
+        <button class="filter-chip">Borradores</button>
+        <button class="filter-chip">⭐ Destacados</button>
+        <button class="filter-chip">Archivados</button>
+      </div>
+
+      <!-- Menús existentes -->
+      <div class="menu-row" onclick="openMenuEditor()">
+        <div>
+          <div class="m-name">Menú diario 5 septiembre <span style="font-size:.85rem">⭐</span></div>
+          <div class="m-sub">Estructura: Menú del día básico · Actualizado hace 2 h</div>
+        </div>
+        <span class="m-days">Jue y Vie · sep–dic</span>
+        <div class="lang-flags">
+          <span class="lang-flag pub">🇪🇸 ES ✓</span>
+          <span class="lang-flag pub">🇬🇧 EN ✓</span>
+        </div>
+        <span class="badge active"><span class="badge-dot"></span>Visible</span>
+      </div>
+
+      <div class="menu-row" onclick="openMenuEditor()">
+        <div>
+          <div class="m-name">Carta de otoño 2025</div>
+          <div class="m-sub">Estructura: Carta de temporada · Actualizado ayer</div>
+        </div>
+        <span class="m-days">Todos los días · oct–dic</span>
+        <div class="lang-flags">
+          <span class="lang-flag pub">🇪🇸 ES ✓</span>
+          <span class="lang-flag pending">🇬🇧 EN …</span>
+        </div>
+        <span class="badge active"><span class="badge-dot"></span>Visible</span>
+      </div>
+
+      <div class="menu-row" onclick="openMenuEditor()">
+        <div>
+          <div class="m-name">Menú fin de semana (en preparación)</div>
+          <div class="m-sub">Estructura: Menú con fotos · Actualizado hace 3 días</div>
+        </div>
+        <span class="m-days">Sáb y Dom</span>
+        <div class="lang-flags">
+          <span class="lang-flag pending">🇪🇸 ES …</span>
+        </div>
+        <span class="badge draft"><span class="badge-dot"></span>Borrador</span>
+      </div>
+
+      <!-- Selector de estructura para nuevo menú -->
+      <h2 class="choose-title" id="choose-struct">¿Nuevo menú? Elige la estructura de partida</h2>
+      <div class="cards-grid">
+
+        <div class="struct-card" onclick="openMenuEditor()">
+          <div class="struct-card-top">
+            <h3>Menú del día básico</h3>
+            <span class="badge active"><span class="badge-dot"></span>Activa</span>
+          </div>
+          <div class="desc">Cabecera + hasta 5 platos con precio. La opción más rápida para el día a día.</div>
+          <div class="mini-diagram">
+            <div class="mini-sec"><div class="bar hero">📰 Cabecera</div></div>
+            <div class="mini-sec"><div class="bar repeat">🍽️ Platos <span class="rep-tag">×1–5</span></div></div>
+          </div>
+          <div class="struct-card-foot">
+            <button class="btn btn-primary btn-sm" style="width:100%;justify-content:center">Usar esta estructura →</button>
+          </div>
+        </div>
+
+        <div class="struct-card" onclick="openMenuEditor()">
+          <div class="struct-card-top">
+            <h3>Menú con fotos</h3>
+            <span class="badge active"><span class="badge-dot"></span>Activa</span>
+          </div>
+          <div class="desc">Con banner de portada y fotografía por plato. Ideal para promocionar.</div>
+          <div class="mini-diagram">
+            <div class="mini-sec"><div class="bar hero">🖼️ Portada</div></div>
+            <div class="mini-sec"><div class="bar repeat">📷 Platos con foto <span class="rep-tag">×1–8</span></div></div>
+          </div>
+          <div class="struct-card-foot">
+            <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">Usar esta estructura →</button>
+          </div>
+        </div>
+
+        <div class="struct-card" onclick="openMenuEditor()">
+          <div class="struct-card-top">
+            <h3>Carta de temporada</h3>
+            <span class="badge active"><span class="badge-dot"></span>Activa</span>
+          </div>
+          <div class="desc">Carta completa con entrantes, principales, postres y vinos.</div>
+          <div class="mini-diagram">
+            <div class="mini-sec"><div class="bar hero">📰 Cabecera</div></div>
+            <div class="mini-sec"><div class="bar repeat">🥗 Entrantes</div></div>
+            <div class="mini-sec"><div class="bar repeat">🍖 Principales</div></div>
+            <div class="mini-sec"><div class="bar repeat">🍰 Postres</div></div>
+          </div>
+          <div class="struct-card-foot">
+            <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">Usar esta estructura →</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- Pantalla: editor de menú ---- -->
+  <div class="screen" id="m-editor">
+
+    <div class="builder-bar">
+      <button class="back" onclick="backToGallery()">← Volver</button>
+      <input class="builder-name-input" value="Menú diario 5 septiembre" placeholder="Nombre del menú…">
+      <span class="badge draft"><span class="badge-dot"></span>Borrador</span>
+      <span class="chip">🧩 Menú del día básico</span>
+      <div class="builder-bar-right">
+        <button class="btn btn-secondary btn-sm">👁️ Vista previa</button>
+        <button class="btn btn-secondary btn-sm">Guardar</button>
+      </div>
+    </div>
+
+    <div class="container-wide">
+      <div class="editor-layout">
+
+        <!-- Columna principal: formulario -->
+        <main>
+
+          <!-- Tabs de idioma -->
+          <div class="lang-tabs">
+            <button class="lang-tab active" onclick="switchLang(this,'es')">🇪🇸 Español <span class="lt-status ok">Publicado</span></button>
+            <button class="lang-tab" onclick="switchLang(this,'en')">🇬🇧 English <span class="lt-status todo">2 campos vacíos</span></button>
+            <button class="lang-tab"><span class="add-lang">＋ Añadir idioma</span></button>
+          </div>
+
+          <div class="callout" style="margin-bottom:18px">
+            <span class="ico">🌐</span>
+            <div>Estás editando en <b>Español</b>. Los campos con <span class="badge active" style="font-size:.68rem;padding:2px 7px">🌐 este idioma</span> cambian al cambiar de pestaña. Los campos con <span class="badge neutral" style="font-size:.68rem;padding:2px 7px">🔒 compartido</span> (precios, fechas, fotos) valen para todos los idiomas.</div>
+            <button class="close" onclick="this.parentElement.style.display='none'">✕</button>
+          </div>
+
+          <!-- Sección: Cabecera -->
+          <div class="form-sec">
+            <div class="form-sec-head"><h4>📰 Cabecera</h4></div>
+            <div class="form-sec-body">
+              <div class="form-field">
+                <label>Título del menú <span class="lang-mark">🌐 este idioma</span></label>
+                <input type="text" value="Menú del día" data-es="Menú del día" data-en="Daily Menu">
+              </div>
+              <div class="form-field">
+                <label>Fecha <span class="lock-mark">🔒 compartido</span></label>
+                <input type="date" value="2025-09-05">
+                <div class="f-hint">Este dato es el mismo en todos los idiomas.</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sección: Platos -->
+          <div class="form-sec">
+            <div class="form-sec-head">
+              <h4>🍽️ Platos</h4>
+              <span class="fs-count">2 de 5 platos</span>
+            </div>
+            <div class="form-sec-body">
+
+              <!-- Plato 1 -->
+              <div class="dish-card">
+                <div class="dish-photo has">🥣</div>
+                <div class="dish-fields">
+                  <div class="dish-head-row">
+                    <span class="d-num">Plato 1</span>
+                    <button class="icon-btn" title="Eliminar plato">🗑</button>
+                  </div>
+                  <div class="form-field" style="margin:0">
+                    <label>Nombre <span class="lang-mark">🌐</span></label>
+                    <input type="text" value="Gazpacho" data-es="Gazpacho" data-en="Gazpacho (cold soup)">
+                  </div>
+                  <div class="form-field" style="margin:0">
+                    <label>Precio € <span class="lock-mark">🔒</span></label>
+                    <input type="number" value="5.50" step="0.10">
+                  </div>
+                  <div class="allergen-row">
+                    <span style="font-size:.73rem;font-weight:700;color:var(--text-3);align-self:center">Alérgenos:</span>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">🌾 Gluten</button>
+                    <button class="allergen-chip on" onclick="this.classList.toggle('on')">🥛 Lácteos</button>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">🥚 Huevo</button>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">🐟 Pescado</button>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">🥜 Frutos secos</button>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">＋ más</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Plato 2 -->
+              <div class="dish-card">
+                <div class="dish-photo">📷</div>
+                <div class="dish-fields">
+                  <div class="dish-head-row">
+                    <span class="d-num">Plato 2</span>
+                    <button class="icon-btn" title="Eliminar plato">🗑</button>
+                  </div>
+                  <div class="form-field" style="margin:0">
+                    <label>Nombre <span class="lang-mark">🌐</span></label>
+                    <input type="text" value="Tortilla de patatas" data-es="Tortilla de patatas" data-en="Spanish omelette">
+                  </div>
+                  <div class="form-field" style="margin:0">
+                    <label>Precio € <span class="lock-mark">🔒</span></label>
+                    <input type="number" value="4.20" step="0.10">
+                  </div>
+                  <div class="allergen-row">
+                    <span style="font-size:.73rem;font-weight:700;color:var(--text-3);align-self:center">Alérgenos:</span>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">🌾 Gluten</button>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">🥛 Lácteos</button>
+                    <button class="allergen-chip on" onclick="this.classList.toggle('on')">🥚 Huevo</button>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">🐟 Pescado</button>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">🥜 Frutos secos</button>
+                    <button class="allergen-chip" onclick="this.classList.toggle('on')">＋ más</button>
+                  </div>
+                </div>
+              </div>
+
+              <button class="add-dish-btn">＋ Añadir plato (máx. 5)</button>
+            </div>
+          </div>
+
+          <!-- Sección: Disponibilidad -->
+          <div class="form-sec">
+            <div class="form-sec-head"><h4>📆 ¿Cuándo se muestra este menú?</h4></div>
+            <div class="form-sec-body">
+              <div class="form-field" style="margin-bottom:10px">
+                <label>Días de la semana</label>
+                <div class="day-chips">
+                  <button class="day-chip" onclick="this.classList.toggle('on')">L</button>
+                  <button class="day-chip" onclick="this.classList.toggle('on')">M</button>
+                  <button class="day-chip" onclick="this.classList.toggle('on')">X</button>
+                  <button class="day-chip on" onclick="this.classList.toggle('on')">J</button>
+                  <button class="day-chip on" onclick="this.classList.toggle('on')">V</button>
+                  <button class="day-chip" onclick="this.classList.toggle('on')">S</button>
+                  <button class="day-chip" onclick="this.classList.toggle('on')">D</button>
+                </div>
+              </div>
+              <div class="date-range-row">
+                <span style="font-size:.8rem;font-weight:700;color:var(--text-2)">Desde</span>
+                <input type="date" value="2025-09-01">
+                <span style="font-size:.8rem;font-weight:700;color:var(--text-2)">hasta</span>
+                <input type="date" value="2025-12-31">
+              </div>
+              <div class="f-hint" style="font-size:.75rem;color:var(--text-3);margin-top:10px">💡 El menú aparecerá automáticamente al público solo los jueves y viernes dentro de estas fechas.</div>
+            </div>
+          </div>
+
+        </main>
+
+        <!-- Columna lateral: publicación -->
+        <aside class="panel pub-panel">
+          <div class="panel-head">
+            <h4>🚀 Para publicar este menú</h4>
+            <p>Cuando todo esté ✓, el menú será visible al público.</p>
+          </div>
+          <div class="panel-body" style="padding-top:4px">
+
+            <div class="check-item">
+              <div class="check-ico ok">✓</div>
+              <div>
+                <div class="c-title">Días y fechas configurados</div>
+                <div class="c-sub">Jueves y viernes · 1 sep – 31 dic 2025</div>
+              </div>
+            </div>
+
+            <div class="check-item">
+              <div class="check-ico ok">✓</div>
+              <div>
+                <div class="c-title">Español completo y publicado</div>
+                <div class="c-sub">Todos los campos obligatorios rellenos.</div>
+              </div>
+            </div>
+
+            <div class="check-item">
+              <div class="check-ico todo"></div>
+              <div>
+                <div class="c-title">English — 2 campos por rellenar</div>
+                <div class="c-sub">Opcional. El menú puede publicarse solo en español.</div>
+                <button class="btn btn-ghost btn-sm" style="margin-top:6px;padding-left:0">Completar inglés →</button>
+              </div>
+            </div>
+
+            <div class="check-item">
+              <div class="check-ico todo"></div>
+              <div>
+                <div class="c-title">Destacar en portada</div>
+                <div class="c-sub">Opcional. Aparecerá primero en la web pública.</div>
+                <label class="tog" onclick="this.classList.toggle('on')" style="margin-top:6px"><span class="tr"></span>Destacar este menú</label>
+              </div>
+            </div>
+
+          </div>
+          <div class="pub-footer">
+            <button class="btn btn-primary" onclick="alert('✅ ¡Menú publicado!\n\nSerá visible al público los jueves y viernes desde el 1 de septiembre.\n\n(Simulación de prototipo)')">🚀 Publicar menú</button>
+            <div class="pub-note">Podrás despublicarlo o editarlo en cualquier momento.</div>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /* ============ NAVEGACIÓN GLOBAL ============ */
+  function switchView(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.getElementById('view-' + name).classList.add('active');
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.toggle('active', t.dataset.view === name));
+    window.scrollTo(0, 0);
+  }
+  function showScreen(viewId, screenId) {
+    document.querySelectorAll('#' + viewId + ' .screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(screenId).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+  function openBuilder(preset) { showScreen('view-estructuras', 'e-builder'); }
+  function backToList() { showScreen('view-estructuras', 'e-list'); }
+  function openMenuEditor() { showScreen('view-menus', 'm-editor'); }
+  function backToGallery() { showScreen('view-menus', 'm-gallery'); }
+
+  /* ============ CAMBIO DE IDIOMA EN EL EDITOR ============
+     Demuestra el concepto clave: al cambiar de pestaña de idioma,
+     SOLO los campos marcados 🌐 (con data-es/data-en) cambian su valor.
+     Los campos 🔒 compartidos (precio, fecha) permanecen intactos. */
+  function switchLang(tabBtn, lang) {
+    // activar tab
+    document.querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
+    tabBtn.classList.add('active');
+
+    // intercambiar valores de los campos traducibles
+    document.querySelectorAll('#m-editor input[data-es]').forEach(input => {
+      // guardar lo escrito en el idioma anterior antes de cambiar
+      const prev = input.dataset.currentLang || 'es';
+      input.dataset[prev] = input.value;
+      // cargar el valor del nuevo idioma
+      input.value = input.dataset[lang] || '';
+      input.dataset.currentLang = lang;
+      input.placeholder = lang === 'en' ? 'Write in English…' : 'Escribe en español…';
+    });
+
+    // actualizar el callout explicativo
+    const callout = document.querySelector('#m-editor .callout div');
+    if (callout) {
+      const nombre = lang === 'en' ? '<b>English</b>' : '<b>Español</b>';
+      callout.innerHTML = callout.innerHTML.replace(/<b>(Español|English)<\/b>/, nombre);
+    }
+  }
+</script>
+</body>
+</html>

@@ -25,6 +25,16 @@ echo [INFO] Ejecutando migraciones y seed inicial...
 docker-compose exec api python scripts/migrate.py
 docker-compose exec api python scripts/seed.py
 
+REM Solo sincroniza si la coleccion esta vacia: la primera vez trae las resenas
+REM y en los siguientes arranques no vuelve a consultar a Google.
+REM Si falla (sin URL configurada, Google caido) NO aborta el arranque.
+echo [INFO] Comprobando resenas de Google...
+docker-compose exec api python scripts/sync_google_reviews.py --if-empty
+if errorlevel 1 (
+    echo [AVISO] No se pudieron sincronizar las resenas. La API arranca igualmente.
+    echo [AVISO] Revisa GOOGLE_REVIEWS_PROVIDER y GOOGLE_MAPS_PLACE_URL en el .env
+)
+
 echo ========================================
 echo    Aralar API iniciada correctamente!
 echo ========================================

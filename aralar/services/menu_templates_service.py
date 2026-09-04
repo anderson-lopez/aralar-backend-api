@@ -24,6 +24,56 @@ class MenuTemplatesService:
         except ValueError as e:
             return {"conflict": str(e)}
 
+    def duplicate(self, template_id: str, slug: str | None = None, name: str | None = None):
+        """Duplica un template como un nuevo **draft** con slug derivado.
+
+        Copia la estructura (``sections``, ``ui``, ``i18n``) y resetea el
+        estado: ``status`` → ``draft``, ``version`` → ``1`` y limpia
+        ``publish_notes``. Duplicar NO es versionar: genera un template nuevo
+        con su propio slug.
+
+        - Si ``slug`` no se pasa, se deriva ``"<slug>-copy"`` resolviendo
+          colisiones (``-copy-2``, ``-copy-3``, …).
+        - Si se pasa ``slug`` explícito y ya existe (version 1), devuelve
+          ``{"conflict": ...}``.
+
+        Devuelve el nuevo ``_id`` (str), ``None`` si el original no existe, o
+        ``{"conflict": ...}`` ante colisión de slug.
+        """
+        t = self.repo.get(template_id)
+        if not t:
+            return None
+
+        new_doc = deepcopy(t)
+        new_doc.pop("_id", None)
+        new_doc.pop("created_at", None)
+        new_doc.pop("updated_at", None)
+        new_doc["status"] = "draft"
+        new_doc["version"] = 1
+        new_doc["publish_notes"] = ""
+        new_doc["name"] = name or f"{t.get('name', '')} (copia)".strip()
+
+        if slug:
+            if self.repo.get_by_slug_version(slug, 1):
+                return {"conflict": f"Template with slug '{slug}' and version 1 already exists"}
+            new_doc["slug"] = slug
+        else:
+            new_doc["slug"] = self._derive_copy_slug(t["slug"])
+
+        return self.repo.insert(new_doc)
+
+    def _derive_copy_slug(self, base_slug: str) -> str:
+        """Devuelve un slug ``<base>-copy`` que no esté en uso por ningún
+        template (cualquier versión). Si ya existe, prueba ``<base>-copy-2``,
+        ``<base>-copy-3``, … hasta encontrar uno libre."""
+        candidate = f"{base_slug}-copy"
+        if not self.repo.list({"slug": candidate}, limit=1):
+            return candidate
+        n = 2
+        while self.repo.list({"slug": f"{candidate}-{n}"}, limit=1):
+            n += 1
+        return f"{candidate}-{n}"
+
     def list(self, status=None, slug=None, tenant_id=None, skip=0, limit=20):
         f = {}
         if status:
@@ -46,6 +96,15 @@ class MenuTemplatesService:
     def get(self, template_id: str):
         return self.repo.get(template_id)
 
+    # Campos de identidad: nunca se actualizan por `update_draft`.
+    # `slug`/`version` son la coordenada por la que los menús referencian la
+    # plantilla (`template_slug`/`template_version`, sin cascada): cambiarlos
+    # dejaría esos menús huérfanos (perderían el manifest `ui` en /render y
+    # `delete_template` dejaría de contarlos). `status` tiene sus propios
+    # endpoints (publish/unpublish/archive). El schema HTTP ya los rechaza con
+    # 422; esto lo garantiza también para llamadas directas al service.
+    _IMMUTABLE_FIELDS = ("_id", "slug", "version", "tenant_id", "status")
+
     def update_draft(self, template_id: str, patch: dict):
         t = self.repo.get(template_id)
         if not t:
@@ -53,9 +112,9 @@ class MenuTemplatesService:
         if t.get("status") != "draft":
             # Señalizamos conflicto sin usar códigos HTTP aquí
             return {"conflict": "only draft templates can be updated"}
-        # Evita intentar modificar _id y otros campos no actualizables a nivel de servicio
-        if "_id" in patch:
-            patch.pop("_id", None)
+        patch = {k: v for k, v in patch.items() if k not in self._IMMUTABLE_FIELDS}
+        if not patch:
+            return template_id
         self.repo.update(template_id, patch)
         return template_id
 

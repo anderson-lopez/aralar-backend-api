@@ -7,11 +7,23 @@ class MenuCreateSchema(Schema):
     template_id = fields.String(required=False)  # either this...
     template_slug = fields.String(required=False)  # ...or these two
     template_version = fields.Integer(required=False)
-    status = fields.String(load_default="draft")
+    # OJO: `status` NO está aquí. Un menú siempre nace en draft; publicarlo tiene su
+    # propio endpoint (`POST /:id/publish`) que exige availability + un locale
+    # publicado. Aceptarlo en el POST dejaba crear menús `published` sin pasar por
+    # esa validación, y colarse en el listado público. Mandarlo devuelve 422.
     common = fields.Dict(required=True)  # only non-translatable fields
     locales = fields.Dict(required=False)  # e.g., { "es-ES": {...}, "en-GB": {...} }
     featured = fields.Boolean(load_default=False)  # if menu is featured for landing
     featured_order = fields.Integer(required=False)  # order priority (lower = higher priority)
+    # Orden en el listado público /public/available (menor = más prioritario, null va al final)
+    list_order = fields.Integer(required=False, allow_none=True)
+    # Servicios a los que pertenece el menú (sección "Otros servicios"). Vacío = menú normal.
+    service_slugs = fields.List(fields.String(), load_default=list)
+
+
+class MenuDuplicateSchema(Schema):
+    # Body opcional: si no viene `name`, el service usa "<name> (copia)".
+    name = fields.String(required=False)
 
 
 class MenuCommonUpdateSchema(Schema):
@@ -22,6 +34,9 @@ class MenuGeneralUpdateSchema(Schema):
     name = fields.String(required=False)
     featured = fields.Boolean(required=False)
     featured_order = fields.Integer(required=False, allow_none=True)
+    list_order = fields.Integer(required=False, allow_none=True)
+    # None o [] limpia la clasificación; ausente deja el valor intacto.
+    service_slugs = fields.List(fields.String(), required=False, allow_none=True)
 
 
 class MenuLocaleUpdateSchema(Schema):
@@ -44,6 +59,8 @@ class MenuSchema(Schema):
     availability = fields.Dict()
     featured = fields.Boolean()
     featured_order = fields.Integer(allow_none=True)
+    list_order = fields.Integer(allow_none=True)
+    service_slugs = fields.List(fields.String())
     created_at = fields.DateTime(dump_only=True)
     updated_at = fields.DateTime(dump_only=True)
 
@@ -93,6 +110,9 @@ class MenuPublicItemSchema(Schema):
     template_slug = fields.String()
     template_version = fields.Integer()
     updated_at = fields.DateTime(allow_none=True)
+    list_order = fields.Integer(allow_none=True)  # orden aplicado (null = sin prioridad, va al final)
+    service_slugs = fields.List(fields.String())  # servicios a los que pertenece el menú
+    locale_used = fields.String()  # idioma efectivo resuelto (puede diferir del pedido)
     title = fields.String()
     summary = fields.String()
     preview_images = fields.List(fields.String())

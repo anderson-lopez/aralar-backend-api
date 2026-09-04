@@ -101,6 +101,66 @@ class TestPublishTemplate:
 
 
 @pytest.mark.integration
+class TestDuplicateTemplate:
+    """Tests de `duplicate(template_id, slug, name)`."""
+
+    def test_returns_none_when_template_not_found(self, db):
+        from bson import ObjectId
+        assert _svc(db).duplicate(str(ObjectId())) is None
+
+    def test_duplicates_with_derived_slug_and_draft_status(self, db):
+        tmpl = seed_template(db, slug="carta", version=3, status="published", name="Carta")
+        new_id = _svc(db).duplicate(str(tmpl["_id"]))
+        assert isinstance(new_id, str)
+        from bson import ObjectId
+        stored = db["menu_templates"].find_one({"_id": ObjectId(new_id)})
+        assert stored["slug"] == "carta-copy"
+        assert stored["version"] == 1
+        assert stored["status"] == "draft"
+        assert stored["name"] == "Carta (copia)"
+        assert stored["publish_notes"] == ""
+
+    def test_copies_sections_structure(self, db):
+        tmpl = seed_template(db, slug="conseccs", version=1)
+        new_id = _svc(db).duplicate(str(tmpl["_id"]))
+        from bson import ObjectId
+        stored = db["menu_templates"].find_one({"_id": ObjectId(new_id)})
+        assert stored["sections"] == tmpl["sections"]
+
+    def test_derives_incremental_slug_on_collision(self, db):
+        tmpl = seed_template(db, slug="menu", version=1)
+        seed_template(db, slug="menu-copy", version=1)
+        seed_template(db, slug="menu-copy-2", version=1)
+        new_id = _svc(db).duplicate(str(tmpl["_id"]))
+        from bson import ObjectId
+        stored = db["menu_templates"].find_one({"_id": ObjectId(new_id)})
+        assert stored["slug"] == "menu-copy-3"
+
+    def test_uses_explicit_slug_when_provided(self, db):
+        tmpl = seed_template(db, slug="base", version=1)
+        new_id = _svc(db).duplicate(str(tmpl["_id"]), slug="mi-nuevo-slug")
+        from bson import ObjectId
+        stored = db["menu_templates"].find_one({"_id": ObjectId(new_id)})
+        assert stored["slug"] == "mi-nuevo-slug"
+
+    def test_returns_conflict_when_explicit_slug_exists(self, db):
+        tmpl = seed_template(db, slug="base", version=1)
+        seed_template(db, slug="ocupado", version=1)
+        result = _svc(db).duplicate(str(tmpl["_id"]), slug="ocupado")
+        assert isinstance(result, dict)
+        assert "conflict" in result
+
+    def test_does_not_mutate_original(self, db):
+        tmpl = seed_template(db, slug="inmutable", version=2, status="published")
+        _svc(db).duplicate(str(tmpl["_id"]))
+        from bson import ObjectId
+        original = db["menu_templates"].find_one({"_id": ObjectId(str(tmpl["_id"]))})
+        assert original["version"] == 2
+        assert original["status"] == "published"
+        assert original["slug"] == "inmutable"
+
+
+@pytest.mark.integration
 class TestListTemplates:
     """
     Tests de `list(status, slug, tenant_id, skip, limit)`.
@@ -173,6 +233,43 @@ class TestUpdateDraft:
     def test_returns_none_when_template_not_found(self, db):
         from bson import ObjectId
         assert _svc(db).update_draft(str(ObjectId()), {"name": "x"}) is None
+
+    def test_ignores_identity_fields(self, db):
+        """slug/version/tenant_id/status son identidad y se descartan.
+
+        Cambiar el slug dejaría huérfanos a los menús que apuntan a
+        (template_slug, template_version): perderían el `ui` en /render y
+        `delete_template` dejaría de contarlos.
+        """
+        tmpl = seed_template(db, slug="estable", version=1, status="draft", name="Original")
+        result = _svc(db).update_draft(str(tmpl["_id"]), {
+            "name": "Cambiado", "slug": "otro", "version": 99,
+            "tenant_id": "otro-tenant", "status": "published",
+        })
+        assert result == str(tmpl["_id"])
+
+        from bson import ObjectId
+        stored = db["menu_templates"].find_one({"_id": ObjectId(str(tmpl["_id"]))})
+        assert stored["name"] == "Cambiado"        # lo editable sí cambia
+        assert stored["slug"] == "estable"          # la identidad no
+        assert stored["version"] == 1
+        assert stored["tenant_id"] == "aralar"
+        assert stored["status"] == "draft"
+
+    def test_slug_stays_immutable_after_unpublish(self, db):
+        """Ruta adversarial: publicar → unpublish (vuelve a draft) → renombrar.
+
+        `unpublish` reabre la ventana de edición, así que la inmutabilidad del
+        slug tiene que vivir en el service, no solo en el estado del template.
+        """
+        tmpl = seed_template(db, slug="estable", version=1, status="published")
+        svc = _svc(db)
+        svc.unpublish(str(tmpl["_id"]))
+        svc.update_draft(str(tmpl["_id"]), {"name": "X", "slug": "renombrado"})
+
+        from bson import ObjectId
+        stored = db["menu_templates"].find_one({"_id": ObjectId(str(tmpl["_id"]))})
+        assert stored["slug"] == "estable"
 
 
 @pytest.mark.integration

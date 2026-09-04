@@ -27,8 +27,9 @@ import pytest
 from aralar.services.menus_service import MenusService
 from aralar.repositories.menus_repo import MenusRepo
 from aralar.repositories.menu_templates_repo import MenuTemplatesRepo
+from aralar.repositories.menu_services_repo import MenuServicesRepo
 
-from tests.factories import make_menu, make_image, seed_menu, seed_template
+from tests.factories import make_menu, make_image, seed_menu, seed_template, seed_menu_service
 
 
 # =============================================================================
@@ -150,6 +151,48 @@ class TestResolveMeta:
 
 
 @pytest.mark.unit
+class TestEffectiveLocale:
+    """
+    Tests de `effective_locale(menu, locale, fallback)`.
+
+    Cascada: locale pedido (si publicado) → fallback explícito (si publicado)
+    → primer locale publicado del menú. Solo cuentan locales con
+    `publish.{loc}.status == "published"`.
+    """
+
+    def setup_method(self):
+        self.svc = MenusService(repo=None, templates_repo=None)
+
+    def test_returns_requested_locale_when_published(self):
+        menu = make_menu(publish={
+            "es-ES": {"status": "published"},
+            "en-GB": {"status": "published"},
+        })
+        assert self.svc.effective_locale(menu, "en-GB") == "en-GB"
+
+    def test_falls_back_to_first_published_when_requested_missing(self):
+        menu = make_menu(publish={"es-ES": {"status": "published"}})
+        # en-GB no publicado → cae al único publicado (es-ES)
+        assert self.svc.effective_locale(menu, "en-GB") == "es-ES"
+
+    def test_prefers_explicit_fallback_over_default(self):
+        menu = make_menu(publish={
+            "es-ES": {"status": "published"},
+            "en-GB": {"status": "published"},
+        })
+        # fr-FR ausente, fallback en-GB publicado → en-GB (no el primero es-ES)
+        assert self.svc.effective_locale(menu, "fr-FR", fallback="en-GB") == "en-GB"
+
+    def test_ignores_non_published_locales(self):
+        menu = make_menu(publish={
+            "es-ES": {"status": "draft"},
+            "en-GB": {"status": "published"},
+        })
+        # es-ES está en draft → no cuenta; cae a en-GB
+        assert self.svc.effective_locale(menu, "fr-FR") == "en-GB"
+
+
+@pytest.mark.unit
 class TestDeepMergeSections:
     """
     Tests del método privado `_deep_merge_sections(base, override)`.
@@ -266,8 +309,10 @@ class TestAvailableOn:
         )
         assert result == []
 
-    def test_only_returns_menus_with_published_locale(self, db):
-        # Menú publicado solo en en-GB.
+    def test_returns_menu_even_when_requested_locale_not_published(self, db):
+        """Nuevo requerimiento: el listado no filtra por idioma. Un menú publicado
+        globalmente sale aunque el locale pedido no exista para él (el idioma
+        efectivo se resuelve aparte con `effective_locale`)."""
         seed_menu(
             db,
             publish={"en-GB": {"status": "published", "published_at": datetime.now(timezone.utc)}},
@@ -278,7 +323,259 @@ class TestAvailableOn:
             tzname="Europe/Madrid",
             date_utc=datetime(2025, 9, 27, 12, 0, tzinfo=timezone.utc),
         )
-        assert result == []
+        assert len(result) == 1
+
+
+@pytest.mark.integration
+class TestAvailableOnOrdering:
+    """
+    Tests del orden del listado público (`available_on`), regido por `list_order`.
+
+    Reglas: `list_order` asc (menor = más prioritario) → los `None` al final →
+    empates desempatados por `updated_at` desc.
+    """
+
+    def _svc(self, db):
+        return MenusService(MenusRepo(db), MenuTemplatesRepo(db))
+
+    def _available(self, db):
+        return self._svc(db).available_on(
+            locale="es-ES",
+            tzname="Europe/Madrid",
+            date_utc=datetime(2025, 9, 27, 12, 0, tzinfo=timezone.utc),
+        )
+
+    def test_orders_by_list_order_ascending(self, db):
+        seed_menu(db, name="tercero", list_order=3)
+        seed_menu(db, name="primero", list_order=1)
+        seed_menu(db, name="segundo", list_order=2)
+
+        names = [m["name"] for m in self._available(db)]
+        assert names == ["primero", "segundo", "tercero"]
+
+    def test_menus_without_list_order_go_last(self, db):
+        seed_menu(db, name="sin orden", list_order=None)
+        seed_menu(db, name="con orden", list_order=5)
+
+        names = [m["name"] for m in self._available(db)]
+        assert names == ["con orden", "sin orden"]
+
+    def test_ties_broken_by_updated_at_desc(self, db):
+        seed_menu(
+            db,
+            name="viejo",
+            list_order=1,
+            updated_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+        )
+        seed_menu(
+            db,
+            name="reciente",
+            list_order=1,
+            updated_at=datetime(2025, 6, 1, tzinfo=timezone.utc),
+        )
+
+        names = [m["name"] for m in self._available(db)]
+        assert names == ["reciente", "viejo"]
+
+    def test_falls_back_to_updated_at_when_no_menu_has_order(self, db):
+        seed_menu(db, name="viejo", updated_at=datetime(2025, 1, 1, tzinfo=timezone.utc))
+        seed_menu(db, name="reciente", updated_at=datetime(2025, 6, 1, tzinfo=timezone.utc))
+
+        names = [m["name"] for m in self._available(db)]
+        assert names == ["reciente", "viejo"]
+
+    def test_zero_is_a_valid_order_and_beats_null(self, db):
+        """`0` es un valor legítimo y no debe confundirse con 'sin orden'."""
+        seed_menu(db, name="sin orden", list_order=None)
+        seed_menu(db, name="cero", list_order=0)
+
+        names = [m["name"] for m in self._available(db)]
+        assert names == ["cero", "sin orden"]
+
+    def test_negative_order_comes_first(self, db):
+        seed_menu(db, name="normal", list_order=1)
+        seed_menu(db, name="destacado", list_order=-10)
+
+        names = [m["name"] for m in self._available(db)]
+        assert names == ["destacado", "normal"]
+
+
+@pytest.mark.integration
+class TestCreateRequiresPublishedTemplate:
+    """
+    Un menú solo puede instanciarse sobre una plantilla **publicada**.
+
+    Sobre un draft sería peligroso: el draft sí se puede editar y el menú
+    quedaría atado a una estructura que cambia bajo sus pies.
+    """
+
+    def _svc(self, db):
+        return MenusService(MenusRepo(db), MenuTemplatesRepo(db))
+
+    def _payload(self):
+        return {
+            "tenant_id": "aralar", "name": "M",
+            "template_slug": "test-template", "template_version": 1, "common": {},
+        }
+
+    def test_creates_on_published_template(self, db):
+        seed_template(db, status="published")
+        res = self._svc(db).create(self._payload())
+        assert res.get("_id")
+
+    def test_rejects_draft_template(self, db):
+        seed_template(db, status="draft")
+        res = self._svc(db).create(self._payload())
+        assert isinstance(res, dict) and res.get("error")
+
+    def test_rejects_archived_template(self, db):
+        seed_template(db, status="archived")
+        res = self._svc(db).create(self._payload())
+        assert isinstance(res, dict) and res.get("error")
+
+    def test_returns_none_when_template_missing(self, db):
+        assert self._svc(db).create(self._payload()) is None
+
+
+@pytest.mark.integration
+class TestServiceClassification:
+    """
+    Clasificación en "Otros servicios" (`service_slugs`).
+
+    Un menú con `service_slugs` no vacío queda FUERA de `available_on` y solo
+    aparece en `service_menus_on(service_slug, ...)`.
+    """
+
+    def _svc(self, db):
+        return MenusService(MenusRepo(db), MenuTemplatesRepo(db))
+
+    def _available(self, db):
+        return self._svc(db).available_on(
+            locale="es-ES",
+            tzname="Europe/Madrid",
+            date_utc=datetime(2025, 9, 27, 12, 0, tzinfo=timezone.utc),
+        )
+
+    def _service(self, db, slug):
+        return self._svc(db).service_menus_on(
+            slug,
+            locale="es-ES",
+            tzname="Europe/Madrid",
+            date_utc=datetime(2025, 9, 27, 12, 0, tzinfo=timezone.utc),
+        )
+
+    def test_available_excludes_menus_with_services(self, db):
+        seed_menu(db, name="normal", service_slugs=[])
+        seed_menu(db, name="clasificado", service_slugs=["desayunos"])
+
+        names = [m["name"] for m in self._available(db)]
+        assert names == ["normal"]
+
+    def test_available_includes_menu_with_missing_service_field(self, db):
+        """Un menú legacy sin el campo `service_slugs` debe seguir apareciendo."""
+        m = make_menu(name="legacy")
+        m.pop("service_slugs", None)
+        db["menus"].insert_one(m)
+
+        names = [x["name"] for x in self._available(db)]
+        assert names == ["legacy"]
+
+    def test_service_menus_returns_only_matching_service(self, db):
+        seed_menu(db, name="desayuno", service_slugs=["desayunos"])
+        seed_menu(db, name="lunch", service_slugs=["lunch"])
+        seed_menu(db, name="normal", service_slugs=[])
+
+        names = [m["name"] for m in self._service(db, "desayunos")]
+        assert names == ["desayuno"]
+
+    def test_service_menus_matches_any_slug_in_array(self, db):
+        seed_menu(db, name="mixto", service_slugs=["desayunos", "lunch"])
+
+        assert [m["name"] for m in self._service(db, "desayunos")] == ["mixto"]
+        assert [m["name"] for m in self._service(db, "lunch")] == ["mixto"]
+
+    def test_service_menus_respects_list_order(self, db):
+        seed_menu(db, name="b", service_slugs=["desayunos"], list_order=2)
+        seed_menu(db, name="a", service_slugs=["desayunos"], list_order=1)
+
+        names = [m["name"] for m in self._service(db, "desayunos")]
+        assert names == ["a", "b"]
+
+    def test_service_menus_empty_for_unknown_slug(self, db):
+        seed_menu(db, name="desayuno", service_slugs=["desayunos"])
+        assert self._service(db, "cena") == []
+
+
+@pytest.mark.integration
+class TestResolveServiceSlugs:
+    """
+    Validación de `service_slugs` en create/update (`_resolve_service_slugs`).
+
+    Requiere `services_repo` para validar existencia/estado; sin él, no valida.
+    """
+
+    def _svc(self, db):
+        return MenusService(
+            MenusRepo(db), MenuTemplatesRepo(db), MenuServicesRepo(db)
+        )
+
+    def test_create_rejects_unknown_service(self, db):
+        seed_template(db)
+        res = self._svc(db).create({
+            "tenant_id": "aralar",
+            "name": "M",
+            "template_slug": "test-template",
+            "template_version": 1,
+            "common": {},
+            "service_slugs": ["inexistente"],
+        })
+        assert isinstance(res, dict) and res.get("error")
+
+    def test_create_accepts_known_active_service(self, db):
+        seed_template(db)
+        seed_menu_service(db, slug="desayunos")
+        res = self._svc(db).create({
+            "tenant_id": "aralar",
+            "name": "M",
+            "template_slug": "test-template",
+            "template_version": 1,
+            "common": {},
+            "service_slugs": ["desayunos"],
+        })
+        assert res.get("service_slugs") == ["desayunos"]
+
+    def test_create_rejects_inactive_service(self, db):
+        seed_template(db)
+        seed_menu_service(db, slug="desayunos", is_active=False)
+        res = self._svc(db).create({
+            "tenant_id": "aralar",
+            "name": "M",
+            "template_slug": "test-template",
+            "template_version": 1,
+            "common": {},
+            "service_slugs": ["desayunos"],
+        })
+        assert isinstance(res, dict) and res.get("error")
+
+    def test_create_normalizes_and_dedups_slugs(self, db):
+        seed_template(db)
+        seed_menu_service(db, slug="desayunos")
+        res = self._svc(db).create({
+            "tenant_id": "aralar",
+            "name": "M",
+            "template_slug": "test-template",
+            "template_version": 1,
+            "common": {},
+            "service_slugs": ["  Desayunos ", "desayunos"],
+        })
+        assert res.get("service_slugs") == ["desayunos"]
+
+    def test_duplicate_inherits_service_slugs(self, db):
+        seed_template(db)
+        seed_menu_service(db, slug="desayunos")
+        m = seed_menu(db, name="orig", service_slugs=["desayunos"])
+        copy = self._svc(db).duplicate(str(m["_id"]))
+        assert copy["service_slugs"] == ["desayunos"]
 
 
 @pytest.mark.integration
@@ -517,6 +814,69 @@ class TestDelete:
         result = self._svc(db).delete(str(menu["_id"]))
         assert result is True
         assert db["menus"].count_documents({}) == 0
+
+
+@pytest.mark.integration
+class TestDuplicate:
+    """Tests del método `duplicate(menu_id, name)`."""
+
+    def _svc(self, db):
+        return MenusService(MenusRepo(db), MenuTemplatesRepo(db))
+
+    def test_returns_none_when_menu_not_found(self, db):
+        from bson import ObjectId
+        assert self._svc(db).duplicate(str(ObjectId())) is None
+
+    def test_copies_content_and_resets_state(self, db):
+        menu = seed_menu(
+            db,
+            name="Original",
+            status="published",
+            featured=True,
+            featured_order=3,
+            common={"items": [{"_id": "i1", "price": 5}]},
+            locales={"es-ES": {"data": {"items": [{"_id": "i1", "name": "Plato"}]},
+                               "meta": {"title": "T"}}},
+        )
+        dup = self._svc(db).duplicate(str(menu["_id"]))
+        # Contenido reutilizable copiado.
+        assert dup["common"] == {"items": [{"_id": "i1", "price": 5}]}
+        assert dup["locales"]["es-ES"]["data"]["items"][0]["name"] == "Plato"
+        assert dup["availability"] == menu["availability"]
+        assert dup["template_slug"] == menu["template_slug"]
+        # Estado reseteado.
+        assert dup["status"] == "draft"
+        assert dup["publish"] == {}
+        assert dup["featured"] is False
+        assert dup["featured_order"] is None
+        # Nombre por defecto.
+        assert dup["name"] == "Original (copia)"
+
+    def test_uses_custom_name_when_provided(self, db):
+        menu = seed_menu(db, name="Original")
+        dup = self._svc(db).duplicate(str(menu["_id"]), name="Copia especial")
+        assert dup["name"] == "Copia especial"
+
+    def test_creates_a_new_document(self, db):
+        menu = seed_menu(db)
+        dup = self._svc(db).duplicate(str(menu["_id"]))
+        assert dup["_id"] != menu["_id"]
+        assert db["menus"].count_documents({}) == 2
+
+    def test_does_not_mutate_original(self, db):
+        menu = seed_menu(db, status="published", featured=True, featured_order=1)
+        self._svc(db).duplicate(str(menu["_id"]))
+        original = db["menus"].find_one({"_id": menu["_id"]})
+        assert original["status"] == "published"
+        assert original["featured"] is True
+
+    def test_deep_copies_nested_structures(self, db):
+        menu = seed_menu(db, common={"items": [{"_id": "i1", "price": 5}]})
+        dup = self._svc(db).duplicate(str(menu["_id"]))
+        # Mutar la copia no debe afectar al original en DB.
+        dup["common"]["items"][0]["price"] = 999
+        original = db["menus"].find_one({"_id": menu["_id"]})
+        assert original["common"]["items"][0]["price"] == 5
 
 
 @pytest.mark.integration

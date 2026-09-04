@@ -6,9 +6,38 @@ from typing import List, Optional
 
 
 class MenusService:
-    def __init__(self, repo, templates_repo):
+    def __init__(self, repo, templates_repo, services_repo=None):
         self.repo = repo
         self.templates_repo = templates_repo
+        # Opcional: cuando está presente, valida que los `service_slugs` de un
+        # menú existan y estén activos para su tenant. Se deja None en los tests
+        # unitarios que instancian el service sin dependencias.
+        self.services_repo = services_repo
+
+    def _resolve_service_slugs(self, tenant_id, slugs):
+        """Normaliza y valida la lista de `service_slugs` de un menú.
+
+        Devuelve ``(slugs_limpios, error)``. `error` es None si todo es válido.
+        - `None`/lista vacía → ``([], None)`` (menú sin clasificación).
+        - Normaliza (strip/lower), deduplica preservando orden.
+        - Si hay `services_repo`, cada slug debe existir y estar activo para el
+          tenant; si no, devuelve error (el blueprint lo traduce a 400).
+        """
+        if slugs is None:
+            return [], None
+        if not isinstance(slugs, list):
+            return [], "service_slugs must be a list"
+        cleaned = []
+        for s in slugs:
+            slug = str(s).strip().lower()
+            if slug and slug not in cleaned:
+                cleaned.append(slug)
+        if self.services_repo is not None:
+            for slug in cleaned:
+                svc = self.services_repo.get_by_slug(tenant_id, slug)
+                if not svc or not svc.get("is_active", True):
+                    return cleaned, f"unknown or inactive service: {slug}"
+        return cleaned, None
 
     def create(self, data: dict):
         # resolve template
@@ -22,19 +51,79 @@ class MenusService:
         if not tmpl:
             return None
 
+        # Un menú es la instancia de una plantilla PUBLICADA. Permitirlo sobre un
+        # draft es peligroso: el draft sí se puede editar (incluido su slug), y el
+        # menú quedaría apuntando a una estructura que cambia bajo sus pies o a un
+        # `(slug, version)` que deja de existir.
+        if tmpl.get("status") != "published":
+            return {"error": "template is not published"}
+
+        service_slugs, err = self._resolve_service_slugs(
+            data["tenant_id"], data.get("service_slugs")
+        )
+        if err:
+            return {"error": err}
+
         doc = {
             "tenant_id": data["tenant_id"],
             "name": data["name"],
             "template_id": str(tmpl["_id"]),
             "template_slug": tmpl["slug"],
             "template_version": tmpl["version"],
-            "status": data.get("status", "draft"),
+            # Siempre draft: se publica por `publish_menu`, que valida. Ignorar lo
+            # que venga en `data` protege también a las llamadas directas al service.
+            "status": "draft",
             "common": data.get("common", {}),
             "locales": data.get("locales", {}),
             "publish": {},
             "featured": data.get("featured", False),
             "featured_order": data.get("featured_order"),
+            "list_order": data.get("list_order"),
+            "service_slugs": service_slugs,
         }
+        _id = self.repo.insert(doc)
+        return self.repo.get(_id)
+
+    def duplicate(self, menu_id: str, name: Optional[str] = None):
+        """Duplica un menú existente como un nuevo draft.
+
+        Copia el contenido reutilizable (``common``, ``locales``, la
+        referencia al template y ``availability``) y **resetea el estado**:
+        - ``status`` → ``draft`` (una copia nunca nace publicada)
+        - ``publish`` → ``{}`` (se limpian los estados de publicación por locale)
+        - ``featured`` / ``featured_order`` → ``False`` / ``None`` (evita dos
+          destacados compitiendo con el mismo orden)
+        - ``list_order`` → ``None`` (misma razón: la copia no hereda la posición
+          del original en el listado público)
+
+        En cambio **sí hereda ``service_slugs``**: la clasificación en "Otros
+        servicios" es identidad del menú (como el template), no posición; lo
+        habitual es duplicar dentro del mismo servicio.
+
+        El nombre por defecto es ``"<name> (copia)"`` salvo que se pase uno.
+        Devuelve el documento nuevo, o ``None`` si el original no existe.
+        """
+        m = self.repo.get(menu_id)
+        if not m:
+            return None
+        doc = {
+            "tenant_id": m.get("tenant_id"),
+            "name": name or f"{m.get('name', '')} (copia)".strip(),
+            "template_id": m.get("template_id"),
+            "template_slug": m.get("template_slug"),
+            "template_version": m.get("template_version"),
+            "status": "draft",
+            "common": deepcopy(m.get("common", {})),
+            "locales": deepcopy(m.get("locales", {})),
+            "publish": {},
+            "featured": False,
+            "featured_order": None,
+            "list_order": None,
+            "service_slugs": list(m.get("service_slugs") or []),
+        }
+        avail = m.get("availability")
+        if avail:
+            doc["availability"] = deepcopy(avail)
         _id = self.repo.insert(doc)
         return self.repo.get(_id)
 
@@ -184,12 +273,17 @@ class MenusService:
         m = self.repo.get(menu_id)
         if not m:
             return None
-        allowed = ("name", "featured", "featured_order")
+        allowed = ("name", "featured", "featured_order", "list_order", "service_slugs")
         patch = {k: v for k, v in payload.items() if k in allowed}
         if not patch:
             return m
         if "featured" in patch and not patch["featured"] and "featured_order" not in patch:
             patch["featured_order"] = None
+        if "service_slugs" in patch:
+            cleaned, err = self._resolve_service_slugs(m.get("tenant_id"), patch["service_slugs"])
+            if err:
+                return {"error": err}
+            patch["service_slugs"] = cleaned
         return self.repo.update(menu_id, patch)
 
     def update_locale(self, menu_id: str, locale: str, data: dict, meta: Optional[dict] = None):
@@ -197,13 +291,25 @@ class MenusService:
         if not m:
             return None
         locales = m.get("locales", {})
-        locales[locale] = {"data": data, "meta": meta}
+        # `meta` normalizado a {}: guardarlo como None hacía que /render devolviera
+        # "meta": null y que title/summary salieran null en el listado público.
+        locales[locale] = {"data": data or {}, "meta": meta or {}}
         return self.repo.update(menu_id, {"locales": locales})
 
     def publish_locale(self, menu_id: str, locale: str):
+        """Publica un idioma concreto del menú.
+
+        **Exige que ese idioma tenga contenido** (`locales.{locale}` con `data` o
+        `meta`). Publicar un locale vacío dejaba el menú en un estado incoherente:
+        aparecía en los listados públicos con ese idioma pero no había nada que
+        renderizar. Se usa `update_locale` para cargar el contenido antes.
+        """
         m = self.repo.get(menu_id)
         if not m:
             return None
+        loc = (m.get("locales") or {}).get(locale)
+        if not loc or not (loc.get("data") or loc.get("meta")):
+            return {"conflict": f"locale '{locale}' has no content to publish"}
         pb = m.get("publish", {})
         pb[locale] = {"status": "published", "published_at": datetime.utcnow().isoformat() + "Z"}
         # Ya no cambiamos el estado global del menú aquí (opción 2)
@@ -276,16 +382,65 @@ class MenusService:
         }
         return self.repo.set_availability(menu_id, norm)
 
+    @staticmethod
+    def _list_sort_key(m: dict):
+        """Clave de orden del listado público.
+
+        Criterios, en cascada:
+        1. `list_order` ascendente → **menor = más prioritario** (1 antes que 2).
+        2. Los menús sin `list_order` (None) van **al final**, no al principio.
+        3. Empates → `updated_at` descendente (el más reciente primero).
+
+        El orden se aplica en Python y no en Mongo a propósito: un `sort`
+        ascendente en Mongo coloca los `null` primero, que es justo lo contrario
+        de lo que queremos. Como `list_published_by_day` devuelve el set completo
+        del día (sin paginar), ordenar aquí es determinista y barato.
+        """
+        order = m.get("list_order")
+        updated = m.get("updated_at")
+        # `updated_at` desc: se invierte con el timestamp negativo. Si falta,
+        # se trata como el más antiguo posible para que caiga al final del grupo.
+        ts = updated.timestamp() if isinstance(updated, datetime) else float("-inf")
+        return (order is None, order if order is not None else 0, -ts)
+
     def available_on(self, locale: str, tzname: str, date_utc: datetime):
         """Lista menús disponibles en la fecha/hora dada (usa tz para calcular weekday y date)."""
         tz = ZoneInfo(tzname)
         dt_local = date_utc.astimezone(tz)
         day_iso = dt_local.date().isoformat()
         weekday = self._weekday_code(dt_local)
-        return self.repo.list_published_by_day(locale=locale, date_iso=day_iso, weekday=weekday)
+        # No se filtra por locale: el listado público debe salir aunque el menú no
+        # tenga el idioma pedido. El idioma efectivo se resuelve luego con
+        # `effective_locale`. `locale` se mantiene en la firma por claridad de intención.
+        items = self.repo.list_published_by_day(date_iso=day_iso, weekday=weekday)
+        return sorted(items, key=self._list_sort_key)
 
     def active_now(self, locale: str, tzname: str):
         return self.available_on(locale=locale, tzname=tzname, date_utc=datetime.now(timezone.utc))
+
+    def service_menus_on(self, service_slug: str, locale: str, tzname: str, date_utc: datetime):
+        """Lista menús de un servicio ("Otros servicios") disponibles en la fecha dada.
+
+        Espejo de `available_on` pero filtrando por `service_slug` en vez de
+        excluir los clasificados. Reutiliza `_list_sort_key` (list_order asc,
+        None al final, empate por updated_at desc) para el orden dentro del
+        servicio. `locale` se mantiene por coherencia de firma; el idioma
+        efectivo se resuelve luego con `effective_locale`.
+        """
+        tz = ZoneInfo(tzname)
+        dt_local = date_utc.astimezone(tz)
+        day_iso = dt_local.date().isoformat()
+        weekday = self._weekday_code(dt_local)
+        items = self.repo.list_service_menus_by_day(
+            service_slug=service_slug, date_iso=day_iso, weekday=weekday
+        )
+        return sorted(items, key=self._list_sort_key)
+
+    def service_menus_now(self, service_slug: str, locale: str, tzname: str):
+        return self.service_menus_on(
+            service_slug=service_slug, locale=locale, tzname=tzname,
+            date_utc=datetime.now(timezone.utc),
+        )
 
     def update_featured(self, menu_id: str, featured: bool, featured_order: Optional[int] = None):
         """Update featured status and order of a menu"""
@@ -496,12 +651,19 @@ class MenusService:
         return payload
 
     def _merge_menu(self, menu_doc: dict, locale: str, fallback: Optional[str] = None) -> dict:
-        """Combina common + locales[locale] (o fallback). No muta el original."""
+        """Combina common + locales[locale] (o fallback). No muta el original.
+
+        **Siempre devuelve `{"data": ..., "meta": ...}`.** Antes, cuando el menú no
+        tenía bloque para ese locale, devolvía `common` pelado y quien llamaba hacía
+        `result["data"]` → `KeyError` → 500. Pasaba con menús que tenían el locale
+        publicado pero sin contenido cargado (ver `publish_locale`).
+        """
         common = deepcopy(menu_doc.get("common", {}))
         locales = menu_doc.get("locales", {}) or {}
         loc = locales.get(locale) or (locales.get(fallback) if fallback else None)
         if not loc:
-            return common  # si no hay traducción, devolvemos solo common
+            # Sin traducción: se devuelve solo `common`, pero con la forma correcta.
+            return {"data": common, "meta": {}}
         # ¡ojo! tomamos sólo el bloque traducible:
         loc_data = loc.get("data") or {}
         if not loc_data and fallback:
@@ -516,7 +678,9 @@ class MenusService:
         )
         if not loc:
             return {}
-        return loc.get("meta", {})
+        # `or {}`: los menús guardados antes de normalizar `update_locale` tienen
+        # `meta: null`, y `.get("meta", {})` devolvería ese None, no el default.
+        return loc.get("meta") or {}
 
     def _deep_merge_sections(self, base, override):
         """
@@ -563,6 +727,34 @@ class MenusService:
         if base is not None and base != "":
             return base
         return override
+
+    def effective_locale(self, m, locale: str, fallback: Optional[str] = None) -> Optional[str]:
+        """Idioma que realmente se mostrará para este menú en un listado público.
+
+        Cascada: `locale` pedido → `fallback` explícito → primer locale publicado
+        del menú (en la práctica su idioma por defecto, p.ej. es-ES). Garantiza
+        que el listado nunca salga sin idioma aunque el pedido no exista para el
+        menú. Solo considera locales con `publish.{loc}.status == "published"`.
+
+        Devuelve **`None`** si el menú no tiene ningún locale publicado. Antes
+        devolvía el `locale` pedido como último recurso, lo que hacía que
+        `locale_used` mintiera: el frontend lo usaba tal cual para llamar a
+        `/render` y recibía un 409 porque ese idioma no estaba publicado. El
+        listado descarta esos menús (no hay nada que mostrar en ningún idioma).
+        """
+        pub = m.get("publish", {}) or {}
+
+        def _is_published(lc: Optional[str]) -> bool:
+            return bool(lc) and isinstance(pub.get(lc), dict) and pub[lc].get("status") == "published"
+
+        if _is_published(locale):
+            return locale
+        if _is_published(fallback):
+            return fallback
+        for lc, v in pub.items():
+            if isinstance(v, dict) and v.get("status") == "published":
+                return lc
+        return None
 
     def resolve_meta(self, m, key, locale, fallback: Optional[str] = None):
         loc = m.get("locales", {})

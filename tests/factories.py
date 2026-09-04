@@ -48,6 +48,8 @@ def make_menu(**overrides) -> dict:
         "status": "published",
         "featured": False,
         "featured_order": None,
+        "list_order": None,
+        "service_slugs": [],
         "common": {},
         "locales": {
             "es-ES": {
@@ -147,5 +149,77 @@ def seed_template(db, **overrides) -> dict:
     """Inserta un template en mongomock y devuelve el documento completo."""
     doc = make_template(**overrides)
     inserted = db["menu_templates"].insert_one(doc)
+    doc["_id"] = inserted.inserted_id
+    return doc
+
+
+def make_menu_service(**overrides) -> dict:
+    """Construye un documento de servicio de menú (colección `menu_services`).
+
+    Defaults:
+    - tenant_id: "aralar", slug: "desayunos", activo, order 1
+    - labels i18n es-ES/en-GB
+
+    Override cualquier campo:
+        make_menu_service(slug="lunch", is_active=False)
+    """
+    base = {
+        "tenant_id": "aralar",
+        "slug": "desayunos",
+        "name": "Desayunos",
+        "labels": {"es-ES": "Desayunos", "en-GB": "Breakfast"},
+        "order": 1,
+        "is_active": True,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+    }
+    base.update(overrides)
+    return base
+
+
+def seed_menu_service(db, **overrides) -> dict:
+    """Inserta un servicio en mongomock y devuelve el documento completo (con _id)."""
+    doc = make_menu_service(**overrides)
+    inserted = db["menu_services"].insert_one(doc)
+    doc["_id"] = inserted.inserted_id
+    return doc
+
+
+def make_google_review(**overrides) -> dict:
+    """Construye un documento de reseña (colección `google_reviews`).
+
+    Defaults: aprobada, 5 estrellas, provider "scraper", decisión automática.
+
+    Override cualquier campo:
+        make_google_review(rating=2, status="pending")
+    """
+    base = {
+        "tenant_id": "aralar",
+        "provider": "scraper",
+        "external_id": "review-1",
+        "rating": 5,
+        "text": "Excelente comida y atención.",
+        "language": "es",
+        "author": {
+            "name": "Ana García",
+            "photo_url": "https://lh3.googleusercontent.com/a/foo",
+            "profile_url": "https://www.google.com/maps/contrib/123",
+        },
+        "published_at": datetime(2026, 7, 1, 12, 0, 0),
+        "status": "approved",
+        "moderation": {"auto": True, "reason": "rating >= 4", "by": None, "at": None},
+        "is_featured": False,
+        "display_order": None,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+    }
+    base.update(overrides)
+    return base
+
+
+def seed_google_review(db, **overrides) -> dict:
+    """Inserta una reseña en mongomock y devuelve el documento completo (con _id)."""
+    doc = make_google_review(**overrides)
+    inserted = db["google_reviews"].insert_one(doc)
     doc["_id"] = inserted.inserted_id
     return doc

@@ -119,9 +119,40 @@ class MenuTemplateCreateSchema(Schema):
             raise ValidationError("Slug must be 100 characters or less", "slug")
 
 
-class MenuTemplateUpdateSchema(MenuTemplateCreateSchema):
-    # same fields; at service enforce status draft-only for updates
-    pass
+class MenuTemplateUpdateSchema(Schema):
+    """Edición de un template en draft. **NO hereda de Create a propósito.**
+
+    `slug`, `version`, `tenant_id` y `status` son **identidad** y quedan fuera:
+
+    - Los menús referencian la plantilla por `(template_slug, template_version)`
+      como texto, sin cascada. Renombrar el slug dejaría esos menús huérfanos:
+      perderían el manifest `ui` en `/render` (silenciosamente, con 200 OK) y
+      `delete_template` dejaría de contarlos, permitiendo borrar una plantilla
+      todavía en uso.
+    - `status` tiene sus propios endpoints (`/publish`, `/unpublish`,
+      `/archive`, `/unarchive`); no debe cambiarse por un PUT genérico.
+
+    Mandar cualquiera de esos campos devuelve 422 (campo desconocido).
+    Para cambiar de slug: duplicar la plantilla y migrar los menús.
+    """
+
+    name = ma_fields.String(required=True)
+    i18n = ma_fields.Dict(required=False)
+    sections = ma_fields.List(ma_fields.Nested(SectionSchema), required=True)
+    ui = ma_fields.Nested(TemplateUISchema, required=False)
+
+
+class MenuTemplateDuplicateSchema(Schema):
+    # Body opcional. Sin `slug`, el service deriva "<slug>-copy". Sin `name`,
+    # usa "<name> (copia)".
+    name = ma_fields.String(required=False)
+    slug = ma_fields.String(
+        required=False,
+        validate=validate.Regexp(
+            r"^[a-z0-9-_]+$",
+            error="Slug must contain only lowercase letters, numbers, hyphens, and underscores",
+        ),
+    )
 
 
 class MenuTemplatePublishSchema(Schema):

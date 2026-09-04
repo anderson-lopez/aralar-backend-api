@@ -301,11 +301,94 @@ GET /api/menus/:id/render?locale=es-ES&include_ui=true
 
 ### 3.3 Consumir Público
 1. **Listado:** `GET /api/menus/public/available?locale=es-ES&tz=Europe/Madrid[&fallback=en-GB]`
-   - Devuelve tarjetas: id, title, summary, template_slug/version
+   - Devuelve tarjetas: id, title, summary, template_slug/version, **locale_used**
+   - **El listado NO filtra por idioma**: un menú sale aunque no tenga el `locale`
+     pedido. En ese caso `title`/`summary` vienen en su idioma por defecto y
+     `locale_used` indica cuál se usó (cascada: locale → fallback → idioma por defecto).
+   - Usa **`locale_used`** como `locale` (o `fallback`) al pedir el `/render` del detalle;
+     si pides `/render` con un locale que el menú no publicó, responde **409**.
+   - **Los items vienen ya ordenados** por `list_order` (ver 3.4). **Respeta el orden
+     del array tal cual llega** — no reordenes en cliente.
+   - **No incluye** los menús clasificados en un servicio (ver 3.5): esos salen solo en
+     `GET /api/menus/public/services/{slug}`.
 2. **Detalle:** `GET /api/menus/:id/render?locale=es-ES&include_ui=true`
    - Renderizar secciones por `ui.sections` (orden ascendente)
    - Mapear `role`/`display` → componentes
    - Usar `ui.catalogs` para iconos de alérgenos y currency para precios
+
+### 3.4 Orden del listado (`list_order`)
+
+Cada menú tiene el campo **`list_order`** (entero, opcional) que controla su posición
+en `/public/available`.
+
+- **Menor = más prioritario.** `list_order: 1` sale antes que `list_order: 2`.
+- Los menús **sin** `list_order` (`null`) van **al final**, ordenados por más recientes.
+- Empates en el mismo `list_order` → se desempata por `updated_at` descendente.
+- `0` y los valores negativos son válidos (útiles para forzar algo al principio).
+
+**Asignarlo** (requiere auth, permiso `menus:update`):
+
+```http
+PUT /api/menus/{id}/general
+Content-Type: application/json
+
+{ "list_order": 1 }
+```
+
+Enviar `{"list_order": null}` lo quita (el menú vuelve al final). Si no envías el
+campo, el valor actual **no se modifica** — puedes actualizar solo `name` sin perder
+el orden.
+
+> **No confundir con `featured_order`**, que ordena únicamente `/public/featured`
+> (la landing de destacados). Son dos campos y dos listados independientes.
+
+### 3.5 Servicios ("Otros servicios")
+
+> **Guía completa: [`FRONTEND_MENU_SERVICES.md`](./FRONTEND_MENU_SERVICES.md)** —
+> CRUD del catálogo, propuesta de UI, casos borde y por qué el slug es inmutable.
+> Lo de abajo es el resumen para consumir la parte pública.
+
+La sección **"Otros servicios"** de la landing muestra menús clasificados en un
+**servicio** (Desayunos, Lunch, Comida para llevar, …). Un menú puede pertenecer a
+**varios** servicios mediante el campo **`service_slugs: string[]`**.
+
+**Regla clave — son dos lugares aparte:**
+- Un menú con `service_slugs` **no vacío** aparece **solo** en su(s) servicio(s) y
+  **queda excluido** de `/public/available`.
+- Un menú con `service_slugs` **vacío** (`[]`) es un menú normal del listado general.
+
+**Catálogo de servicios** (para pintar la sección y sus tabs):
+
+```http
+GET /api/menu-services/public?locale=es-ES[&tenant_id=aralar]
+→ { "items": [ { "slug": "desayunos", "name": "Desayunos", "label": "Desayunos", "order": 1 }, ... ] }
+```
+
+Solo devuelve servicios **activos**, ordenados por `order`. Usa `label` (resuelto por
+`locale`, cae a `name`) como texto visible; usa `slug` para pedir sus menús:
+
+```http
+GET /api/menus/public/services/{slug}?locale=es-ES&tz=Europe/Madrid[&fallback=en-GB]
+```
+
+Devuelve las **mismas tarjetas ligeras** que `/public/available` (con `list_order`,
+`locale_used`, `title`, `summary`, `preview_images` y `service_slugs`), ordenadas por
+`list_order`. Al hacer clic pide el `/render` normal con `locale_used`.
+
+**Clasificar un menú** (auth, `menus:update`):
+
+```http
+PUT /api/menus/{id}/general
+{ "service_slugs": ["desayunos", "lunch"] }
+```
+
+- Cada slug debe existir y estar **activo** (si no → `400`).
+- `[]` limpia la clasificación (el menú vuelve a `/public/available`).
+- Campo ausente = no se modifica.
+
+**Gestión del catálogo** (auth, `menu_services:*`): `POST/GET/PUT/DELETE
+/api/menu-services`. Borrar un servicio referenciado por menús devuelve `409`
+(primero reasigna o desactiva con `PUT {"is_active": false}`).
 
 ## 4. Mapeo UI → Componentes
 

@@ -69,6 +69,14 @@ class TranslateRequestSchema(Schema):
         "br","co","eo","la","yi","jv","su","ceb","hmn","ht","mi","sm","mg",
         "ny","sn","st","so","rw","lg"
     }
+    # Idiomas soportados por NLLB (subconjunto con mapeo ISO 639-1 definido en NLLBProvider.LANG_MAP)
+    _NLLB_LANGS = {
+        "es","en","fr","de","it","pt","ru","ja","ko","zh","ar",
+        "eu","ca","gl","nl","sv","da","no","fi","pl","cs","sk","hu","ro",
+        "bg","hr","sl","et","lv","lt","uk","tr","hi","vi","id","ms","th",
+        "bn","fa","ur","he","sw","mk","sq","ka","mn","kk","uz","az","am",
+        "af","tl",
+    }
 
     @staticmethod
     def _provider_name() -> str:
@@ -82,6 +90,8 @@ class TranslateRequestSchema(Schema):
         p = cls._provider_name()
         if p == "google":
             return set(cls._GOOGLE_LANGS) | {"auto"}
+        if p == "nllb":
+            return set(cls._NLLB_LANGS)
         return set(cls._DEEPL_SOURCE_LANGS)  # DeepL: no 'auto'
 
     @classmethod
@@ -89,6 +99,8 @@ class TranslateRequestSchema(Schema):
         p = cls._provider_name()
         if p == "google":
             return set(cls._GOOGLE_LANGS)
+        if p == "nllb":
+            return set(cls._NLLB_LANGS)
         return set(cls._DEEPL_TARGET_LANGS)
 
     @validates("source_lang")
@@ -96,10 +108,11 @@ class TranslateRequestSchema(Schema):
         if value is None or str(value).strip() == "":
             return
         v = str(value).lower()
+        p = self._provider_name()
         allowed = self._allowed_source_langs()
         if v not in allowed:
-            raise ValidationError(f"source_lang '{value}' no soportado para proveedor '{self._provider_name()}'. Permitidos: {sorted(allowed)}")
-        if self._provider_name() == "deepl" and v == "auto":
+            raise ValidationError(f"source_lang '{value}' no soportado para proveedor '{p}'. Permitidos: {sorted(allowed)}")
+        if p == "deepl" and v == "auto":
             raise ValidationError("Para DeepL no se admite 'auto'. Omite source_lang para autodetección.")
 
     @validates("target_lang")
